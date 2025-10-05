@@ -1,0 +1,107 @@
+# .gitignore for 2nd-brain project
+# Keep source, configs and migrations; ignore generated artifacts, secrets and local data
+
+########################
+# Operating systems
+########################
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+########################
+# Node / Frontend
+########################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.parcel-cache/
+.pnp/
+.pnp.js
+
+# Next.js
+.next/
+out/
+dist/
+build/
+static/.cache/
+
+# per-app folders (explicit)
+frontend/node_modules/
+frontend/.next/
+landingpage/node_modules/
+landingpage/.next/
+
+########################
+# Python / Backend
+########################
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.python-version
+.mypy_cache/
+.pytest_cache/
+venv/
+.venv/
+env/
+ENV/
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+*.egg
+
+########################
+# Database / local data
+########################
+# Keep migration scripts and SQL files in source control; ignore runtime DB files
+backend/data/*.db
+backend/data/*.sqlite
+*.db
+*.sqlite
+
+########################
+# Secrets / env
+########################
+.env
+.env.*
+secrets.json
+*.key
+*.pem
+
+########################
+# Logs / reports / coverage
+########################
+logs/
+*.log
+.coverage
+coverage.xml
+htmlcov/
+
+########################
+# IDE / Editor
+########################
+.vscode/
+.idea/
+*.suo
+*.user
+*.sln
+*.swp
+*~
+
+########################
+# Misc
+########################
+.DS_Store
+Thumbs.db
+__MACOSX/
+npm-packages-offline-cache/
+*.bak
+*.tmp
+*.old
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+
+# Optional: lockfile should be committed (package-lock.json / yarn.lock), do not ignore

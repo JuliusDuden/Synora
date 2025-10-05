@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --synora-900: #0f1724; /* deep */
+  --synora-700: #1a2236;
+  --synora-accent: #6c63ff;
+  --muted: #6b7280;
+}
+
+@layer base {
+  html,body,#__next { height: 100%; }
+  body {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    color: var(--synora-900);
+    background: linear-gradient(180deg, #fbfdff 0%, #f5f7ff 100%);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,h2,h3 { color: var(--synora-700); }
+  a { color: inherit; }
+}
+
+/* Simple utility for the subtle glass card used across the page */
+.card-glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.7));
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(15,23,36,0.06);
+}
+
+.text-muted { color: var(--muted); }
+.btn-primary {
+  background: linear-gradient(90deg,var(--synora-accent),#5b4dff);
+  color: white;
+  padding: .6rem 1.1rem;
+  border-radius: .75rem;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(108,99,255,0.18); }
+
+.section-gap { padding-top: 4rem; padding-bottom: 4rem; }
+
+

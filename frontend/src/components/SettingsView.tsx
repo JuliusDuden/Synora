@@ -18,16 +18,44 @@ export default function SettingsView() {
 
   useEffect(() => {
     loadSettings();
+    
+    // Listen for dark mode changes from other components
+    const handleDarkModeChange = (event: any) => {
+      const newDarkMode = event.detail?.darkMode;
+      if (newDarkMode !== undefined) {
+        setSettings(prev => ({ ...prev, darkMode: newDarkMode }));
+      }
+    };
+    
+    window.addEventListener('darkModeChange', handleDarkModeChange);
+    
+    return () => {
+      window.removeEventListener('darkModeChange', handleDarkModeChange);
+    };
   }, []);
 
   const loadSettings = () => {
     const saved = localStorage.getItem('settings');
     if (saved) {
-      setSettings(JSON.parse(saved));
+      const parsedSettings = JSON.parse(saved);
+      setSettings(parsedSettings);
+      
+      // Apply dark mode to DOM immediately on load
+      if (parsedSettings.darkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
     } else {
       // Detect system dark mode preference
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setSettings({ darkMode: isDark, language: 'de' });
+      const defaultSettings = { darkMode: isDark, language: 'de' };
+      setSettings(defaultSettings);
+      localStorage.setItem('settings', JSON.stringify(defaultSettings));
+      
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
     }
   };
 
@@ -47,7 +75,13 @@ export default function SettingsView() {
   };
 
   const toggleDarkMode = () => {
-    saveSettings({ ...settings, darkMode: !settings.darkMode });
+    const newSettings = { ...settings, darkMode: !settings.darkMode };
+    saveSettings(newSettings);
+    
+    // Notify other components (like main app)
+    window.dispatchEvent(new CustomEvent('darkModeChange', { 
+      detail: { darkMode: newSettings.darkMode } 
+    }));
   };
 
   const changeLanguage = (language: string) => {

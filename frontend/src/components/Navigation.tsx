@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, FileText, FolderKanban, CheckSquare, Lightbulb, Calendar, Settings, Network } from 'lucide-react';
+import { Home, FileText, FolderKanban, CheckSquare, Lightbulb, Calendar, Settings, Network, StickyNote } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 
 interface NavigationProps {
@@ -14,6 +14,7 @@ export default function Navigation({ currentView, onViewChange }: NavigationProp
   const navItems = [
     { id: 'dashboard', label: t.nav.dashboard, icon: Home },
     { id: 'notes', label: t.nav.notes, icon: FileText },
+    { id: 'snippets', label: 'Snippets', icon: StickyNote },
     { id: 'projects', label: t.nav.projects, icon: FolderKanban },
     { id: 'tasks', label: t.nav.tasks, icon: CheckSquare },
     { id: 'ideas', label: t.nav.ideas, icon: Lightbulb },

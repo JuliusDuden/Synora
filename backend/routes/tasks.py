@@ -3,11 +3,12 @@ Tasks API routes - User-specific
 """
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 import sqlite3
 import os
 import uuid
+import json
 
 from models.user import User
 from routes.auth import get_current_user
@@ -29,6 +30,9 @@ class TaskCreate(BaseModel):
     priority: str = "medium"
     due_date: Optional[str] = None
     project_id: Optional[str] = None
+    tags: Optional[List[str]] = None
+    reminder: Optional[str] = None
+    favorite: Optional[bool] = False
 
 
 class TaskUpdate(BaseModel):
@@ -38,6 +42,11 @@ class TaskUpdate(BaseModel):
     priority: Optional[str] = None
     due_date: Optional[str] = None
     project_id: Optional[str] = None
+    tags: Optional[List[str]] = None
+    subtasks: Optional[List[Any]] = None
+    reminder: Optional[str] = None
+    favorite: Optional[bool] = None
+    linked_notes: Optional[List[str]] = None
 
 
 class Task(BaseModel):
@@ -50,6 +59,11 @@ class Task(BaseModel):
     project_id: Optional[str]
     created_at: str
     modified_at: str
+    tags: Optional[List[str]] = None
+    subtasks: Optional[List[Any]] = None
+    reminder: Optional[str] = None
+    favorite: Optional[bool] = False
+    linked_notes: Optional[List[str]] = None
 
 
 @router.get("", response_model=List[Task])
@@ -77,20 +91,30 @@ async def list_tasks(
     rows = cursor.fetchall()
     conn.close()
     
-    return [
-        Task(
-            id=row["id"],
-            title=row["title"],
-            description=row["description"],
-            completed=bool(row["completed"]),
-            priority=row["priority"],
-            due_date=row["due_date"],
-            project_id=row["project_id"],
-            created_at=row["created_at"],
-            modified_at=row["modified_at"]
-        )
-        for row in rows
-    ]
+    tasks = []
+    for row in rows:
+        # Convert Row to dict to safely check for columns
+        row_dict = dict(row)
+        
+        task_dict = {
+            "id": row_dict["id"],
+            "title": row_dict["title"],
+            "description": row_dict["description"],
+            "completed": bool(row_dict["completed"]),
+            "priority": row_dict["priority"],
+            "due_date": row_dict["due_date"],
+            "project_id": row_dict["project_id"],
+            "created_at": row_dict["created_at"],
+            "modified_at": row_dict["modified_at"],
+            "tags": json.loads(row_dict["tags"]) if row_dict.get("tags") else None,
+            "subtasks": json.loads(row_dict["subtasks"]) if row_dict.get("subtasks") else None,
+            "reminder": row_dict.get("reminder"),
+            "favorite": bool(row_dict.get("favorite", 0)),
+            "linked_notes": json.loads(row_dict["linked_notes"]) if row_dict.get("linked_notes") else None
+        }
+        tasks.append(Task(**task_dict))
+    
+    return tasks
 
 
 @router.post("", response_model=Task)
@@ -108,12 +132,16 @@ async def create_task(
     cursor.execute("""
         INSERT INTO tasks (
             id, user_id, title, description, completed,
-            priority, due_date, project_id, created_at, modified_at
+            priority, due_date, project_id, created_at, modified_at,
+            tags, reminder, favorite
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         task_id, current_user.id, task.title, task.description, 0,
-        task.priority, task.due_date, task.project_id, now, now
+        task.priority, task.due_date, task.project_id, now, now,
+        json.dumps(task.tags) if task.tags else None,
+        task.reminder,
+        1 if task.favorite else 0
     ))
     
     conn.commit()
@@ -128,7 +156,12 @@ async def create_task(
         due_date=task.due_date,
         project_id=task.project_id,
         created_at=now,
-        modified_at=now
+        modified_at=now,
+        tags=task.tags,
+        subtasks=None,
+        reminder=task.reminder,
+        favorite=task.favorite,
+        linked_notes=None
     )
 
 
@@ -175,6 +208,21 @@ async def update_task(
     if task.project_id is not None:
         updates.append("project_id = ?")
         values.append(task.project_id)
+    if task.tags is not None:
+        updates.append("tags = ?")
+        values.append(json.dumps(task.tags))
+    if task.subtasks is not None:
+        updates.append("subtasks = ?")
+        values.append(json.dumps(task.subtasks))
+    if task.reminder is not None:
+        updates.append("reminder = ?")
+        values.append(task.reminder)
+    if task.favorite is not None:
+        updates.append("favorite = ?")
+        values.append(1 if task.favorite else 0)
+    if task.linked_notes is not None:
+        updates.append("linked_notes = ?")
+        values.append(json.dumps(task.linked_notes))
     
     now = datetime.utcnow().isoformat()
     updates.append("modified_at = ?")
@@ -198,16 +246,24 @@ async def update_task(
     row = cursor.fetchone()
     conn.close()
     
+    # Convert Row to dict
+    row_dict = dict(row)
+    
     return Task(
-        id=row["id"],
-        title=row["title"],
-        description=row["description"],
-        completed=bool(row["completed"]),
-        priority=row["priority"],
-        due_date=row["due_date"],
-        project_id=row["project_id"],
-        created_at=row["created_at"],
-        modified_at=row["modified_at"]
+        id=row_dict["id"],
+        title=row_dict["title"],
+        description=row_dict["description"],
+        completed=bool(row_dict["completed"]),
+        priority=row_dict["priority"],
+        due_date=row_dict["due_date"],
+        project_id=row_dict["project_id"],
+        created_at=row_dict["created_at"],
+        modified_at=row_dict["modified_at"],
+        tags=json.loads(row_dict["tags"]) if row_dict.get("tags") else None,
+        subtasks=json.loads(row_dict["subtasks"]) if row_dict.get("subtasks") else None,
+        reminder=row_dict.get("reminder"),
+        favorite=bool(row_dict.get("favorite", 0)),
+        linked_notes=json.loads(row_dict["linked_notes"]) if row_dict.get("linked_notes") else None
     )
 
 

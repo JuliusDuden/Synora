@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Clock, Check, ArrowRight, FolderOpen, Trash2, CheckSquare } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 import { api } from '@/lib/api';
+import TaskDetailView from './TaskDetailView';
 
 interface Task {
   id?: string;
@@ -22,6 +23,7 @@ interface TaskCardProps {
   onToggle: (id: string) => void;
   onMoveToProgress?: (id: string) => void;
   onDelete: (id: string) => void;
+  onClick?: (id: string) => void;
   priorityColors: Record<string, string>;
   projects: any[];
 }
@@ -41,6 +43,7 @@ export default function TasksView() {
   const [projects, setProjects] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     loadTasks();
@@ -114,10 +117,26 @@ export default function TasksView() {
     try {
       await api.deleteTask(id);
       setTasks(tasks.filter(t => t.id !== id));
+      // Reload projects to update their task counts
+      loadProjects();
     } catch (error) {
       console.error('Failed to delete task:', error);
     }
   };
+
+  // Show detail view if task is selected
+  if (selectedTaskId) {
+    return (
+      <TaskDetailView
+        taskId={selectedTaskId}
+        onBack={() => {
+          setSelectedTaskId(null);
+          loadTasks(); // Reload tasks when coming back
+          loadProjects(); // Reload projects to update their task counts
+        }}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -225,6 +244,7 @@ export default function TasksView() {
                   onToggle={toggleStatus}
                   onMoveToProgress={moveToProgress}
                   onDelete={deleteTask}
+                  onClick={setSelectedTaskId}
                   priorityColors={priorityColors}
                   projects={projects}
                 />
@@ -249,6 +269,7 @@ export default function TasksView() {
                   task={task}
                   onToggle={toggleStatus}
                   onDelete={deleteTask}
+                  onClick={setSelectedTaskId}
                   priorityColors={priorityColors}
                   projects={projects}
                 />
@@ -273,6 +294,7 @@ export default function TasksView() {
                   task={task}
                   onToggle={toggleStatus}
                   onDelete={deleteTask}
+                  onClick={setSelectedTaskId}
                   priorityColors={priorityColors}
                   projects={projects}
                 />
@@ -303,15 +325,26 @@ export default function TasksView() {
   );
 }
 
-function TaskCard({ task, onToggle, onMoveToProgress, onDelete, priorityColors, projects }: TaskCardProps) {
+function TaskCard({ task, onToggle, onMoveToProgress, onDelete, onClick, priorityColors, projects }: TaskCardProps) {
   const project = projects.find(p => String(p.id) === String(task.project_id));
   const priorityClass = priorityColors[task.priority] || '';
 
   return (
-    <div className={`bg-white dark:bg-gray-900 rounded-lg p-3 border-l-4 ${priorityClass} border-r border-t border-b border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow`}>
+    <div 
+      onClick={(e) => {
+        // Only open detail if not clicking on action buttons
+        if (!(e.target as HTMLElement).closest('button')) {
+          onClick?.(task.id!);
+        }
+      }}
+      className={`bg-white dark:bg-gray-900 rounded-lg p-3 border-l-4 ${priorityClass} border-r border-t border-b border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer`}
+    >
       <div className="flex items-start gap-3">
         <button
-          onClick={() => onToggle(task.id!)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(task.id!);
+          }}
           className="mt-0.5 flex-shrink-0"
         >
           <div className="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors bg-gray-200 dark:bg-gray-800 border-gray-300 dark:border-gray-700">
@@ -334,7 +367,10 @@ function TaskCard({ task, onToggle, onMoveToProgress, onDelete, priorityColors, 
         <div className="flex items-center gap-1">
           {onMoveToProgress && !task.completed && !task.due_date && (
             <button
-              onClick={() => onMoveToProgress(task.id!)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveToProgress(task.id!);
+              }}
               className="text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
               title="Move to In Progress"
             >
@@ -342,7 +378,10 @@ function TaskCard({ task, onToggle, onMoveToProgress, onDelete, priorityColors, 
             </button>
           )}
           <button
-            onClick={() => onDelete(task.id!)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(task.id!);
+            }}
             className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
           >
             <Trash2 size={16} />

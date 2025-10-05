@@ -20,7 +20,16 @@ class IndexService:
         
     async def initialize(self):
         """Initialize database and FTS"""
+        # Use WAL journal mode and set a busy timeout to cooperate with sync writes
         self.db = await aiosqlite.connect(str(self.db_path))
+        try:
+            await self.db.execute("PRAGMA journal_mode=WAL;")
+        except Exception:
+            pass
+        try:
+            await self.db.execute("PRAGMA busy_timeout=30000;")
+        except Exception:
+            pass
         
         # Create tables
         await self.db.execute("""
@@ -74,7 +83,10 @@ class IndexService:
     async def close(self):
         """Close database connection"""
         if self.db:
-            await self.db.close()
+            try:
+                await self.db.close()
+            except Exception:
+                pass
     
     async def index_note(self, name: str, path: str, title: str, content: str,
                         tags: List[str], links: List[str], modified):

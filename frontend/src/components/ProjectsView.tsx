@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Clock, Trash2, ArrowLeft, FileText, CheckSquare } from 'lucide-react';
+import { Plus, Folder, Clock, Trash2, ArrowLeft, FileText, CheckSquare, Pin } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 import { api } from '@/lib/api';
 
@@ -18,21 +18,29 @@ interface Project {
 interface ProjectsViewProps {
   onProjectSelect?: (projectId: string) => void;
   onNoteClick?: (noteName: string) => void;
+  selectedProjectId?: string | null;
 }
 
-export default function ProjectsView({ onProjectSelect, onNoteClick }: ProjectsViewProps) {
+export default function ProjectsView({ onProjectSelect, onNoteClick, selectedProjectId: initialProjectId }: ProjectsViewProps) {
   const { t } = useTranslation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '' });
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId || null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadProjects();
     loadTasks();
   }, []);
+
+  // Update selected project when prop changes
+  useEffect(() => {
+    if (initialProjectId) {
+      setSelectedProjectId(initialProjectId);
+    }
+  }, [initialProjectId]);
 
   const loadProjects = async () => {
     try {
@@ -133,54 +141,54 @@ export default function ProjectsView({ onProjectSelect, onNoteClick }: ProjectsV
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-1">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-1">
               {t.projects.title}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
               {projects.length} {projects.length === 1 ? t.projects.subtitle : t.projects.title}
             </p>
           </div>
           <button 
             onClick={() => setIsCreating(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-xs sm:text-sm font-medium transition-colors w-full sm:w-auto justify-center"
           >
-            <Plus size={18} />
+            <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
             {t.projects.newProject}
           </button>
         </div>
 
         {/* Create Form */}
         {isCreating && (
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 border border-gray-200 dark:border-gray-800">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
+            <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
               {t.projects.newProject}
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
                   {t.projects.projectName}
                 </label>
                 <input
                   type="text"
                   value={newProject.name}
                   onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                   placeholder={t.projects.projectName + '...'}
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
                   {t.projects.projectDescription}
                 </label>
                 <textarea
                   value={newProject.description}
                   onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white resize-none"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white resize-none"
                   rows={3}
                   placeholder={t.projects.projectDescription + '...'}
                 />
@@ -300,7 +308,9 @@ interface ProjectDetailViewProps {
 function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewProps) {
   const [notes, setNotes] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [snippets, setSnippets] = useState<any[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
+  const [loadingSnippets, setLoadingSnippets] = useState(true);
   const [creatingNote, setCreatingNote] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
   const [newNoteName, setNewNoteName] = useState('');
@@ -309,11 +319,12 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
 
   useEffect(() => {
     loadProjectData();
+    loadProjectSnippets();
   }, [project.id]);
 
   const calculateProgress = (): number => {
     if (tasks.length === 0) return 0;
-    const completedTasks = tasks.filter(t => t.status === 'done').length;
+    const completedTasks = tasks.filter(t => t.completed).length;
     return Math.round((completedTasks / tasks.length) * 100);
   };
 
@@ -340,12 +351,49 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
       setNotes([]);
     }
     
-    // Load tasks from localStorage that belong to this project
-    const allTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
-    const projectTasks = allTasks.filter((task: any) => task.projectId === project.id);
-    setTasks(projectTasks);
+    // Load tasks from backend that belong to this project
+    try {
+      const allTasks = await api.getTasks();
+      const projectTasks = allTasks.filter((task: any) => 
+        String(task.project_id) === String(project.id)
+      );
+      setTasks(projectTasks);
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      setTasks([]);
+    }
     
     setLoadingNotes(false);
+  };
+
+  const loadProjectSnippets = () => {
+    setLoadingSnippets(true);
+    (async () => {
+      try {
+        const allSnippets = await api.getSnippets().catch(() => null);
+        let projectSnippets: any[] = [];
+        if (allSnippets && Array.isArray(allSnippets)) {
+          projectSnippets = allSnippets.filter((snippet: any) => {
+            return snippet.connections?.some((conn: any) => 
+              conn.type === 'project' && String(conn.id) === String(project.id)
+            );
+          });
+        } else {
+          const storageKey = (await import('@/lib/api')).getSnippetsStorageKey();
+          const savedSnippets = localStorage.getItem(storageKey);
+          if (savedSnippets) {
+            const parsed = JSON.parse(savedSnippets);
+            projectSnippets = parsed.filter((snippet: any) => snippet.connections?.some((conn: any) => conn.type === 'project' && String(conn.id) === String(project.id)));
+          }
+        }
+        setSnippets(projectSnippets);
+      } catch (error) {
+        console.error('Error loading snippets:', error);
+        setSnippets([]);
+      } finally {
+        setLoadingSnippets(false);
+      }
+    })();
   };
 
   const createNote = async () => {
@@ -382,26 +430,26 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
     }
   };
 
-  const createTask = () => {
+  const createTask = async () => {
     if (!newTaskTitle.trim()) return;
 
-    const allTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
-    const newTask = {
-      id: Date.now().toString(),
-      title: newTaskTitle,
-      priority: newTaskPriority,
-      status: 'todo',
-      projectId: project.id,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      await api.createTask({
+        title: newTaskTitle,
+        priority: newTaskPriority,
+        completed: false,
+        project_id: project.id,
+      });
 
-    const updatedTasks = [...allTasks, newTask];
-    localStorage.setItem('tasks', JSON.stringify(updatedTasks));
-    
-    setNewTaskTitle('');
-    setNewTaskPriority('medium');
-    setCreatingTask(false);
-    loadProjectData();
+      setNewTaskTitle('');
+      setNewTaskPriority('medium');
+      setCreatingTask(false);
+      // Reload project data to show the new task
+      loadProjectData();
+    } catch (error) {
+      console.error('Error creating task:', error);
+      alert('Fehler beim Erstellen der Aufgabe');
+    }
   };
 
   return (
@@ -459,7 +507,7 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
               </div>
               <div>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {tasks.filter(t => t.status === 'done').length}/{tasks.length}
+                  {tasks.filter(t => t.completed).length}/{tasks.length}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Aufgaben erledigt</p>
               </div>
@@ -560,6 +608,59 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
           </div>
         </div>
 
+        {/* Snippets Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Snippets</h2>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {snippets.length} {snippets.length === 1 ? 'Snippet' : 'Snippets'}
+            </span>
+          </div>
+          <div className="p-4 space-y-3">
+            {loadingSnippets ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Lädt...</p>
+            ) : snippets.length > 0 ? (
+              <div className="space-y-2">
+                {snippets.map((snippet: any) => (
+                  <div
+                    key={snippet.id}
+                    onClick={() => {
+                      // Navigate to snippets view - could be enhanced to open specific snippet
+                      window.location.href = '/?view=snippets';
+                    }}
+                    className="p-3 bg-gray-50 dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer transition-colors group"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                          {snippet.title}
+                        </h3>
+                        {snippet.content && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                            {snippet.content.substring(0, 100)}
+                            {snippet.content.length > 100 ? '...' : ''}
+                          </p>
+                        )}
+                        {snippet.pinned && (
+                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900 rounded text-xs text-yellow-700 dark:text-yellow-300">
+                            <Pin size={10} />
+                            Angeheftet
+                          </span>
+                        )}
+                      </div>
+                      <FileText size={16} className="text-gray-400 dark:text-gray-600 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors flex-shrink-0" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Noch keine Snippets. Erstelle ein Snippet und verknüpfe es mit diesem Projekt.
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* Tasks Section */}
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
           <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
@@ -624,34 +725,37 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
             
             {tasks.length > 0 ? (
               <div className="space-y-2">
-                {tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800"
-                  >
-                    <div className={`w-2 h-2 rounded-full ${
-                      task.status === 'done' ? 'bg-green-500' : 
-                      task.status === 'in-progress' ? 'bg-amber-500' : 
-                      'bg-gray-300 dark:bg-gray-600'
-                    }`} />
-                    <span className={`text-sm flex-1 ${
-                      task.status === 'done' 
-                        ? 'text-gray-500 dark:text-gray-400 line-through' 
-                        : 'text-gray-900 dark:text-white'
-                    }`}>
-                      {task.title}
-                    </span>
-                    {task.priority && (
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        task.priority === 'high' ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400' :
-                        task.priority === 'medium' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400' :
-                        'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400'
+                {tasks.map((task) => {
+                  const status = task.completed ? 'done' : task.due_date ? 'in-progress' : 'todo';
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800"
+                    >
+                      <div className={`w-2 h-2 rounded-full ${
+                        status === 'done' ? 'bg-green-500' : 
+                        status === 'in-progress' ? 'bg-amber-500' : 
+                        'bg-gray-300 dark:bg-gray-600'
+                      }`} />
+                      <span className={`text-sm flex-1 ${
+                        status === 'done' 
+                          ? 'text-gray-500 dark:text-gray-400 line-through' 
+                          : 'text-gray-900 dark:text-white'
                       }`}>
-                        {task.priority === 'high' ? 'Hoch' : task.priority === 'medium' ? 'Mittel' : 'Niedrig'}
+                        {task.title}
                       </span>
-                    )}
-                  </div>
-                ))}
+                      {task.priority && (
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          task.priority === 'high' ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400' :
+                          task.priority === 'medium' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400' :
+                          'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400'
+                        }`}>
+                          {task.priority === 'high' ? 'Hoch' : task.priority === 'medium' ? 'Mittel' : 'Niedrig'}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400">

@@ -9,8 +9,13 @@ from contextlib import asynccontextmanager
 import uvicorn
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from routes import notes, search, graph, tags, auth, projects, tasks, ideas, habits
+from routes import snippets
 from services.index_service import IndexService
 
 # Configuration
@@ -37,6 +42,7 @@ async def lifespan(app: FastAPI):
     print(f"✅ Synora Backend started")
     print(f"📁 Vault Path: {VAULT_PATH.absolute()}")
     print(f"🗄️  Database: {DATABASE_PATH.absolute()}")
+    print(f"🌐 CORS Origins: {CORS_ORIGINS}")
     
     yield
     
@@ -71,6 +77,7 @@ app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(ideas.router, prefix="/api/ideas", tags=["ideas"])
 app.include_router(habits.router, prefix="/api/habits", tags=["habits"])
+app.include_router(snippets.router, prefix="/api/snippets", tags=["snippets"])
 
 
 @app.get("/")

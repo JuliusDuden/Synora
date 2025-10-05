@@ -104,6 +104,30 @@ def migrate():
                 completed_at TEXT NOT NULL
             )
         """)
+
+        # Create snippets table
+        print("Creating snippets table...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS snippets (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT,
+                content TEXT,
+                color TEXT,
+                pinned INTEGER DEFAULT 0,
+                items TEXT,
+                code TEXT,
+                images TEXT,
+                links TEXT,
+                voice_note TEXT,
+                connections TEXT,
+                pinned_to_dashboard INTEGER DEFAULT 0,
+                reminder TEXT,
+                created_at TEXT NOT NULL,
+                modified_at TEXT NOT NULL
+            )
+        """)
+        print("✅ Snippets table created")
         
         conn.commit()
         print("✅ All tables created successfully!")

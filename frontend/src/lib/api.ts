@@ -375,6 +375,77 @@ class API {
     if (!res.ok) throw new Error('Failed to complete habit');
     return res.json();
   }
+
+  // Snippets API
+  async getSnippets(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/snippets`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch snippets');
+    return res.json();
+  }
+
+  async createSnippet(data: any): Promise<any> {
+    const res = await fetch(`${API_URL}/api/snippets`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to create snippet');
+    }
+    return res.json();
+  }
+
+  async updateSnippet(id: string, data: any): Promise<any> {
+    const res = await fetch(`${API_URL}/api/snippets/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update snippet');
+    return res.json();
+  }
+
+  async deleteSnippet(id: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/snippets/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to delete snippet');
+  }
 }
 
 export const api = new API();
+
+/**
+ * Return a localStorage key for snippets that is specific to the authenticated user (by JWT 'sub' claim).
+ * Falls back to a guest key when no token is present or decoding fails.
+ */
+export function getSnippetsStorageKey(): string {
+  if (typeof window === 'undefined') return 'snippets_guest';
+  const token = localStorage.getItem('auth_token');
+  if (!token) return 'snippets_guest';
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return 'snippets_guest';
+    // base64url decode
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4);
+    const json = atob(padded);
+    const obj = JSON.parse(json);
+    const sub = obj.sub || obj.email || 'guest';
+    // sanitize key (avoid characters that could confuse localStorage consumers)
+    const safe = String(sub).replace(/[^a-zA-Z0-9@._-]/g, '_');
+    return `snippets_${safe}`;
+  } catch (e) {
+    return 'snippets_guest';
+  }
+}

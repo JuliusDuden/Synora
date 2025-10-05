@@ -13,6 +13,7 @@ import TasksView from '@/components/TasksView';
 import IdeasView from '@/components/IdeasView';
 import HabitsView from '@/components/HabitsView';
 import SettingsView from '@/components/SettingsView';
+import SnippetsView from '@/components/SnippetsView';
 import SearchBar from '@/components/SearchBar';
 import NewNoteDialog from '@/components/NewNoteDialog';
 import { Menu, Search, Moon, Sun, LogOut } from 'lucide-react';
@@ -28,25 +29,94 @@ function MainApp() {
   const [darkMode, setDarkMode] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [newNoteDialogOpen, setNewNoteDialogOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  // Handle URL parameters on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const noteParam = params.get('note');
+      const viewParam = params.get('view');
+      const projectParam = params.get('project');
+
+      if (noteParam) {
+        setCurrentNote(noteParam);
+        setView('notes');
+      } else if (viewParam) {
+        setView(viewParam);
+        if (viewParam === 'projects' && projectParam) {
+          setSelectedProjectId(projectParam);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    // Load theme preference
-    const isDark = localStorage.getItem('darkMode') === 'true';
-    setDarkMode(isDark);
-    if (isDark) {
-      document.documentElement.classList.add('dark');
+    // Load theme preference from settings
+    const savedSettings = localStorage.getItem('settings');
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      setDarkMode(settings.darkMode || false);
+      if (settings.darkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } else {
+      // Check old darkMode setting or system preference
+      const oldDarkMode = localStorage.getItem('darkMode') === 'true';
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = oldDarkMode || systemDark;
+      
+      setDarkMode(isDark);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
+      
+      // Migrate to new settings format
+      localStorage.setItem('settings', JSON.stringify({ darkMode: isDark, language: 'de' }));
+      localStorage.removeItem('darkMode'); // Remove old setting
     }
+    
+    // Listen for dark mode changes from SettingsView
+    const handleDarkModeChange = (event: any) => {
+      const newDarkMode = event.detail?.darkMode;
+      if (newDarkMode !== undefined) {
+        setDarkMode(newDarkMode);
+        if (newDarkMode) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    };
+    
+    window.addEventListener('darkModeChange', handleDarkModeChange);
+    
+    return () => {
+      window.removeEventListener('darkModeChange', handleDarkModeChange);
+    };
   }, []);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
-    localStorage.setItem('darkMode', String(newMode));
+    
+    // Update settings in localStorage
+    const savedSettings = localStorage.getItem('settings');
+    const settings = savedSettings ? JSON.parse(savedSettings) : { language: 'de' };
+    settings.darkMode = newMode;
+    localStorage.setItem('settings', JSON.stringify(settings));
+    
+    // Apply to DOM
     if (newMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
+    
+    // Trigger event for other components (like SettingsView)
+    window.dispatchEvent(new CustomEvent('darkModeChange', { detail: { darkMode: newMode } }));
   };
 
   const handleLogout = () => {
@@ -77,16 +147,43 @@ function MainApp() {
     setView('dashboard');
   };
 
+  const handleNavigateToProject = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setView('projects');
+    // Update URL without reload
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', 'projects');
+      url.searchParams.set('project', projectId);
+      window.history.pushState({}, '', url);
+    }
+  };
+
+  const handleNavigateToNote = (notePath: string) => {
+    setCurrentNote(notePath);
+    setView('notes');
+    // Update URL without reload
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('note', notePath);
+      url.searchParams.delete('view');
+      url.searchParams.delete('project');
+      window.history.pushState({}, '', url);
+    }
+  };
+
   const renderContent = () => {
     switch (view) {
       case 'dashboard':
         return <Dashboard />;
       case 'notes':
         return <Editor noteName={currentNote} onNoteChange={setCurrentNote} onNoteDeleted={handleNoteDeleted} />;
+      case 'snippets':
+        return <SnippetsView onNavigateToNote={handleNavigateToNote} onNavigateToProject={handleNavigateToProject} />;
       case 'graph':
         return <GraphView onNodeClick={handleNoteSelect} />;
       case 'projects':
-        return <ProjectsView onNoteClick={handleNoteSelect} />;
+        return <ProjectsView onNoteClick={handleNoteSelect} selectedProjectId={selectedProjectId} />;
       case 'tasks':
         return <TasksView />;
       case 'ideas':
@@ -119,11 +216,19 @@ function MainApp() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-900">
+      {/* Mobile Overlay - closes sidebar when clicked */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar with Navigation */}
       <div
         className={`${
-          sidebarOpen ? 'w-64' : 'w-0'
-        } transition-all duration-300 overflow-hidden border-r border-gray-200 dark:border-gray-700 flex flex-col`}
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 transition-transform duration-300 overflow-hidden border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900`}
       >
         {/* Navigation */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -159,7 +264,7 @@ function MainApp() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4">
+        <header className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-4">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -167,9 +272,10 @@ function MainApp() {
             >
               <Menu size={20} />
             </button>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
               {view === 'dashboard' && t.nav.dashboard}
               {view === 'notes' && t.nav.notes}
+              {view === 'snippets' && 'Snippets'}
               {view === 'graph' && t.nav.graph}
               {view === 'projects' && t.nav.projects}
               {view === 'tasks' && t.nav.tasks}
@@ -179,27 +285,27 @@ function MainApp() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={() => setSearchOpen(true)}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
               title="Search (Ctrl+K)"
             >
-              <Search size={20} />
+              <Search size={18} className="sm:w-5 sm:h-5" />
             </button>
             <button
               onClick={toggleDarkMode}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
               title="Toggle Dark Mode"
             >
-              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+              {darkMode ? <Sun size={18} className="sm:w-5 sm:h-5" /> : <Moon size={18} className="sm:w-5 sm:h-5" />}
             </button>
             <button
               onClick={handleLogout}
               className="p-2 hover:bg-red-100 dark:hover:bg-red-950 text-red-600 dark:text-red-400 rounded-lg transition-colors"
               title={t.auth.logout}
             >
-              <LogOut size={20} />
+              <LogOut size={18} className="sm:w-5 sm:h-5" />
             </button>
           </div>
         </header>
