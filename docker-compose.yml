@@ -12,7 +12,7 @@ services:
     environment:
       - VAULT_PATH=/app/vault
       - DATABASE_PATH=/app/data/notes.db
-      - CORS_ORIGINS=http://localhost:3000
+      - CORS_ORIGINS=http://synora.duckdns.org,http://localhost:3000
     restart: unless-stopped
 
   frontend:
@@ -21,7 +21,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://synora.duckdns.org:8000
     depends_on:
       - backend
     restart: unless-stopped
