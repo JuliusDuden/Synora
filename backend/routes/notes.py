@@ -147,45 +147,56 @@ async def get_note(name: str, current_user: User = Depends(get_current_user)):
 @router.post("", response_model=dict)
 async def create_note(note_data: NoteCreate, current_user: User = Depends(get_current_user)):
     """Create a new note for current user"""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Check if note already exists for this user
-    cursor.execute("""
-        SELECT id FROM notes 
-        WHERE user_id = ? AND name = ?
-    """, (current_user.id, note_data.name))
-    
-    if cursor.fetchone():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Check if note already exists for this user
+        cursor.execute("""
+            SELECT id FROM notes 
+            WHERE user_id = ? AND name = ?
+        """, (current_user.id, note_data.name))
+        
+        if cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=409, detail="Note already exists")
+        
+        # Extract metadata from frontmatter
+        metadata = parse_frontmatter(note_data.content)
+        
+        # Create note
+        note_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        path = note_data.folder + "/" + note_data.name if note_data.folder else note_data.name
+        
+        cursor.execute("""
+            INSERT INTO notes (
+                id, user_id, name, path, content, 
+                title, project, tags,
+                is_encrypted, created_at, modified_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            note_id, current_user.id, note_data.name, path, 
+            note_data.content,
+            metadata['title'], metadata['project'], json.dumps(metadata['tags']),
+            0, now, now
+        ))
+        
+        conn.commit()
         conn.close()
-        raise HTTPException(status_code=409, detail="Note already exists")
-    
-    # Extract metadata from frontmatter
-    metadata = parse_frontmatter(note_data.content)
-    
-    # Create note
-    note_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
-    path = note_data.folder + "/" + note_data.name if note_data.folder else note_data.name
-    
-    cursor.execute("""
-        INSERT INTO notes (
-            id, user_id, name, path, content, 
-            title, project, tags,
-            is_encrypted, created_at, modified_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        note_id, current_user.id, note_data.name, path, 
-        note_data.content,
-        metadata['title'], metadata['project'], json.dumps(metadata['tags']),
-        0, now, now
-    ))
-    
-    conn.commit()
-    conn.close()
-    
-    return {"success": True, "name": note_data.name, "id": note_id}
+        
+        return {"success": True, "name": note_data.name, "id": note_id}
+    except HTTPException:
+        raise
+    except sqlite3.IntegrityError as e:
+        print(f"Database integrity error: {e}")
+        raise HTTPException(status_code=409, detail=f"Database constraint error: {str(e)}")
+    except Exception as e:
+        print(f"Error creating note: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create note: {str(e)}")
 
 
 @router.put("/{name:path}", response_model=dict)
