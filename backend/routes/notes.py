@@ -60,13 +60,13 @@ def parse_frontmatter(content: str):
     return metadata
 
 def get_db():
-    """Get database connection"""
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA busy_timeout=30000;")
-    except Exception:
-        pass
+    """Get database connection with optimized settings"""
+    conn = sqlite3.connect(DB_PATH, timeout=60, check_same_thread=False, isolation_level=None)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=60000")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA cache_size=10000")
+    conn.execute("PRAGMA temp_store=MEMORY")
     conn.row_factory = sqlite3.Row
     return conn
 
