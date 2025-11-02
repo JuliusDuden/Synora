@@ -29,7 +29,7 @@ def migrate():
         else:
             print("Adding user_id column...")
             
-            # Step 1: Create new table with user_id
+            # Step 1: Create new table with all required columns
             cursor.execute("""
                 CREATE TABLE notes_new (
                     id TEXT PRIMARY KEY,
@@ -38,10 +38,13 @@ def migrate():
                     path TEXT,
                     title TEXT,
                     content TEXT,
+                    project TEXT,
                     tags TEXT,
                     links TEXT,
-                    modified TIMESTAMP,
+                    is_encrypted INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    modified TIMESTAMP,
                     UNIQUE(user_id, name)
                 )
             """)
@@ -59,7 +62,10 @@ def migrate():
             
             # Step 3: Copy data from old table (assign all notes to first user)
             cursor.execute("""
-                INSERT INTO notes_new (id, user_id, name, path, title, content, tags, links, modified)
+                INSERT INTO notes_new (
+                    id, user_id, name, path, title, content, 
+                    tags, links, modified, created_at, modified_at
+                )
                 SELECT 
                     LOWER(HEX(RANDOMBLOB(16))),
                     ?,
@@ -69,7 +75,9 @@ def migrate():
                     content,
                     tags,
                     links,
-                    modified
+                    modified,
+                    COALESCE(modified, CURRENT_TIMESTAMP),
+                    COALESCE(modified, CURRENT_TIMESTAMP)
                 FROM notes
             """, (default_user_id,))
             
