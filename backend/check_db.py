@@ -14,10 +14,23 @@ def check_database():
     try:
         print("=== Database Health Check ===\n")
         
+        # Check table schema
+        print("Notes table schema:")
+        cursor.execute("PRAGMA table_info(notes)")
+        columns = cursor.fetchall()
+        for col in columns:
+            print(f"   - {col[1]} ({col[2]})")
+        
+        print("\nUsers table schema:")
+        cursor.execute("PRAGMA table_info(users)")
+        columns = cursor.fetchall()
+        for col in columns:
+            print(f"   - {col[1]} ({col[2]})")
+        
         # Check journal mode
         cursor.execute("PRAGMA journal_mode")
         journal_mode = cursor.fetchone()[0]
-        print(f"Journal Mode: {journal_mode}")
+        print(f"\nJournal Mode: {journal_mode}")
         if journal_mode != "wal":
             print("⚠️  WARNING: Not in WAL mode. Run optimize_db.py to fix.")
         
@@ -35,21 +48,6 @@ def check_database():
         notes_count = cursor.fetchone()[0]
         print(f"\n📝 Total notes: {notes_count}")
         
-        # Check for duplicate notes per user
-        cursor.execute("""
-            SELECT user_id, name, COUNT(*) as count 
-            FROM notes 
-            GROUP BY user_id, name 
-            HAVING COUNT(*) > 1
-        """)
-        duplicates = cursor.fetchall()
-        if duplicates:
-            print(f"\n⚠️  WARNING: Found {len(duplicates)} duplicate notes:")
-            for dup in duplicates[:5]:  # Show first 5
-                print(f"   User {dup[0]}: '{dup[1]}' (x{dup[2]})")
-        else:
-            print("\n✅ No duplicate notes found")
-        
         # Check indexes
         cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='notes'")
         indexes = cursor.fetchall()
@@ -57,14 +55,12 @@ def check_database():
         for idx in indexes:
             print(f"   - {idx[0]}")
         
-        if len(indexes) < 3:
-            print("\n⚠️  WARNING: Missing indexes. Run optimize_db.py to add them.")
-        
         print("\n=== Check Complete ===")
         
     except Exception as e:
         print(f"❌ Error checking database: {e}")
-        raise
+        import traceback
+        traceback.print_exc()
     finally:
         conn.close()
 
