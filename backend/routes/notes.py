@@ -61,7 +61,12 @@ def parse_frontmatter(content: str):
 
 def get_db():
     """Get database connection"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+    except Exception:
+        pass
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -249,23 +254,47 @@ async def update_note(
 
 @router.delete("/{name:path}", response_model=dict)
 async def delete_note(name: str, current_user: User = Depends(get_current_user)):
-    """Delete a note for current user"""
+    """Delete a note for current user and all its attachments"""
     conn = get_db()
     cursor = conn.cursor()
     
+    # First, get the note content to extract attachment IDs
+    cursor.execute("""
+        SELECT content FROM notes 
+        WHERE user_id = ? AND name = ?
+    """, (current_user.id, name))
+    
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    content = row[0]
+    
+    # Extract attachment IDs from markdown content
+    # Pattern: ![...](/api/attachments/{id})
+    import re
+    attachment_pattern = r'!\[.*?\]\(/api/attachments/([a-f0-9]+)\)'
+    attachment_ids = re.findall(attachment_pattern, content)
+    
+    # Delete all attachments referenced in the note
+    if attachment_ids:
+        placeholders = ','.join('?' * len(attachment_ids))
+        cursor.execute(f"""
+            DELETE FROM attachments 
+            WHERE id IN ({placeholders})
+        """, attachment_ids)
+    
+    # Delete the note
     cursor.execute("""
         DELETE FROM notes 
         WHERE user_id = ? AND name = ?
     """, (current_user.id, name))
     
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Note not found")
-    
     conn.commit()
     conn.close()
     
-    return {"success": True}
+    return {"success": True, "deleted_attachments": len(attachment_ids)}
 
 
 @router.post("/daily", response_model=dict)

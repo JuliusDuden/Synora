@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, FileText, FolderKanban, CheckSquare, Lightbulb, Calendar, Settings, Network, StickyNote } from 'lucide-react';
+import { Home, FileText, FolderKanban, CheckSquare, Lightbulb, Calendar, Network, StickyNote } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 
 interface NavigationProps {
@@ -20,7 +20,6 @@ export default function Navigation({ currentView, onViewChange }: NavigationProp
     { id: 'ideas', label: t.nav.ideas, icon: Lightbulb },
     { id: 'habits', label: t.nav.habits, icon: Calendar },
     { id: 'graph', label: t.nav.graph, icon: Network },
-    { id: 'settings', label: t.nav.settings, icon: Settings },
   ];
   return (
     <nav className="flex flex-col gap-1 p-2">
@@ -32,8 +31,9 @@ export default function Navigation({ currentView, onViewChange }: NavigationProp
           <button
             key={item.id}
             onClick={() => onViewChange(item.id)}
+            title={item.label}
             className={`
-              flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
+              flex items-center justify-center p-3 rounded-lg
               transition-all duration-200
               ${
                 isActive
@@ -42,11 +42,7 @@ export default function Navigation({ currentView, onViewChange }: NavigationProp
               }
             `}
           >
-            <Icon size={18} className={isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'} />
-            <span>{item.label}</span>
-            {isActive && (
-              <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-            )}
+            <Icon size={20} className={isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'} />
           </button>
         );
       })}

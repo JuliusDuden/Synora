@@ -16,7 +16,7 @@ import SettingsView from '@/components/SettingsView';
 import SnippetsView from '@/components/SnippetsView';
 import SearchBar from '@/components/SearchBar';
 import NewNoteDialog from '@/components/NewNoteDialog';
-import { Menu, Search, Moon, Sun, LogOut } from 'lucide-react';
+import { Menu, Search, Moon, Sun } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/useTranslation';
 
@@ -177,7 +177,22 @@ function MainApp() {
       case 'dashboard':
         return <Dashboard />;
       case 'notes':
-        return <Editor noteName={currentNote} onNoteChange={setCurrentNote} onNoteDeleted={handleNoteDeleted} />;
+        return (
+          <div className="flex h-full">
+            {/* Notes Sidebar */}
+            <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <Sidebar
+                currentNote={currentNote}
+                onNoteSelect={handleNoteSelect}
+                onCreateNote={() => setNewNoteDialogOpen(true)}
+              />
+            </div>
+            {/* Editor */}
+            <div className="flex-1">
+              <Editor noteName={currentNote} onNoteChange={setCurrentNote} onNoteDeleted={handleNoteDeleted} />
+            </div>
+          </div>
+        );
       case 'snippets':
         return <SnippetsView onNavigateToNote={handleNavigateToNote} onNavigateToProject={handleNavigateToProject} />;
       case 'graph':
@@ -228,60 +243,33 @@ function MainApp() {
       <div
         className={`${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 transition-transform duration-300 overflow-hidden border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900`}
+        } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-16 transition-transform duration-300 overflow-hidden border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900`}
       >
-        {/* Navigation */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
-            {t.appName}
-          </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {t.appMotto} 🚀
-          </p>
-          {user && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-              👤 {user.username}
-            </p>
-          )}
+        {/* Logo */}
+        <div className="h-14 flex items-center justify-center border-b border-gray-200 dark:border-gray-700">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+            S
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto">
           <Navigation currentView={view} onViewChange={setView} />
         </div>
-
-        {/* Notes Sidebar (only show when in notes view) */}
-        {view === 'notes' && (
-          <div className="border-t border-gray-200 dark:border-gray-700">
-            <Sidebar
-              currentNote={currentNote}
-              onNoteSelect={handleNoteSelect}
-              onCreateNote={() => setNewNoteDialogOpen(true)}
-            />
-          </div>
-        )}
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               <Menu size={20} />
             </button>
-            <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-              {view === 'dashboard' && t.nav.dashboard}
-              {view === 'notes' && t.nav.notes}
-              {view === 'snippets' && 'Snippets'}
-              {view === 'graph' && t.nav.graph}
-              {view === 'projects' && t.nav.projects}
-              {view === 'tasks' && t.nav.tasks}
-              {view === 'ideas' && t.nav.ideas}
-              {view === 'habits' && t.nav.habits}
-              {view === 'settings' && t.nav.settings}
+            <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Synora
             </h1>
           </div>
 
@@ -300,13 +288,42 @@ function MainApp() {
             >
               {darkMode ? <Sun size={18} className="sm:w-5 sm:h-5" /> : <Moon size={18} className="sm:w-5 sm:h-5" />}
             </button>
-            <button
-              onClick={handleLogout}
-              className="p-2 hover:bg-red-100 dark:hover:bg-red-950 text-red-600 dark:text-red-400 rounded-lg transition-colors"
-              title={t.auth.logout}
-            >
-              <LogOut size={18} className="sm:w-5 sm:h-5" />
-            </button>
+            
+            {/* User Avatar Dropdown */}
+            <div className="relative group">
+              <button
+                className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold hover:shadow-lg transition-shadow"
+                title={user?.username}
+              >
+                {user?.username?.charAt(0).toUpperCase() || 'U'}
+              </button>
+              
+              {/* Dropdown Menu */}
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {user?.username}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {user?.email}
+                  </p>
+                </div>
+                <div className="py-1">
+                  <button
+                    onClick={() => setView('settings')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    ⚙️ {t.nav.settings}
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"
+                  >
+                    🚪 {t.auth.logout}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </header>
 

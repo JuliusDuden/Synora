@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { api, type Note } from '@/lib/api';
+import { api, uploadAttachment, type Note } from '@/lib/api';
 import MarkdownPreview from './MarkdownPreview';
-import Backlinks from './Backlinks';
-import { Save, Eye, Code, Trash2 } from 'lucide-react';
+import StatusBar from './StatusBar';
+import FileInfoModal from './FileInfoModal';
 import { useTranslation } from '@/lib/useTranslation';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+const RichTextEditor = dynamic(() => import('./RichTextEditor'), { ssr: false });
 
 interface EditorProps {
   noteName: string | null;
@@ -22,13 +23,17 @@ export default function Editor({ noteName, onNoteChange, onNoteDeleted }: Editor
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [preview, setPreview] = useState(false);
+  const [editorMode, setEditorMode] = useState<'markdown' | 'wysiwyg' | 'reading'>('markdown');
   const [isDark, setIsDark] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [deleting, setDeleting] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [backlinksCount, setBacklinksCount] = useState(0);
+  const editorRef = useRef<any>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Initial dark mode check
@@ -65,8 +70,31 @@ export default function Editor({ noteName, onNoteChange, onNoteDeleted }: Editor
     } else {
       setNote(null);
       setContent('');
+      setBacklinksCount(0);
     }
   }, [noteName]);
+
+  // Auto-save when content changes (after 2 seconds of inactivity)
+  useEffect(() => {
+    if (!noteName || !note) return;
+
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Set new timeout for auto-save
+    saveTimeoutRef.current = setTimeout(() => {
+      saveNote();
+    }, 2000);
+
+    // Cleanup on unmount
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [content]);
 
   const loadNote = async (name: string) => {
     setLoading(true);
@@ -92,6 +120,7 @@ export default function Editor({ noteName, onNoteChange, onNoteDeleted }: Editor
       setNewTitle(data.metadata.title || name);
       setSelectedProject(data.metadata.project || '');
       setEditingTitle(false);
+      setBacklinksCount(data.backlinks?.length || 0);
     } catch (error) {
       console.error('Failed to load note:', error);
     } finally {
@@ -100,7 +129,7 @@ export default function Editor({ noteName, onNoteChange, onNoteDeleted }: Editor
   };
 
   const saveNote = async () => {
-    if (!noteName || !note) return;
+    if (!noteName || !note || saving) return;
 
     setSaving(true);
     try {
@@ -204,6 +233,32 @@ export default function Editor({ noteName, onNoteChange, onNoteDeleted }: Editor
     onNoteChange(linkName);
   };
 
+  const handleInsertText = (text: string, cursorOffset: number = 0) => {
+    if (editorRef.current) {
+      const editor = editorRef.current;
+      const selection = editor.getSelection();
+      const id = { major: 1, minor: 1 };
+      const op = {
+        identifier: id,
+        range: selection,
+        text: text,
+        forceMoveMarkers: true,
+      };
+      editor.executeEdits('wysiwyg-toolbar', [op]);
+      
+      // Move cursor
+      if (cursorOffset !== 0) {
+        const position = editor.getPosition();
+        const newPosition = {
+          lineNumber: position.lineNumber,
+          column: position.column + cursorOffset,
+        };
+        editor.setPosition(newPosition);
+      }
+      editor.focus();
+    }
+  };
+
   if (!noteName) {
     return (
       <div className="h-full flex items-center justify-center text-gray-500">
@@ -221,138 +276,503 @@ export default function Editor({ noteName, onNoteChange, onNoteDeleted }: Editor
   }
 
   return (
-    <div className="h-full flex">
-      {/* Editor Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Editor Header */}
-        <div className="h-12 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4">
-          {editingTitle ? (
-            <input
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onBlur={() => {
+    <div className="h-full flex flex-col">
+      {/* Editor Header */}
+      <div className="h-12 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 bg-white dark:bg-gray-800">
+        {editingTitle ? (
+          <input
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onBlur={() => {
+              saveTitle();
+              setEditingTitle(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
                 saveTitle();
                 setEditingTitle(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  saveTitle();
-                  setEditingTitle(false);
-                } else if (e.key === 'Escape') {
-                  setNewTitle(note?.metadata.title || noteName || '');
-                  setEditingTitle(false);
-                }
-              }}
-              className="font-semibold bg-transparent border-b-2 border-primary-500 outline-none px-1"
-              autoFocus
-            />
-          ) : (
-            <h2 
-              className="font-semibold truncate cursor-pointer hover:text-primary-500"
-              onClick={() => setEditingTitle(true)}
-              title="Click to edit title"
-            >
-              {note?.metadata.title || noteName}
-            </h2>
-          )}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPreview(!preview)}
-              className={`p-2 rounded-lg ${
-                preview
-                  ? 'bg-primary-500 text-white'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-              title="Toggle Preview"
-            >
-              {preview ? <Code size={18} /> : <Eye size={18} />}
-            </button>
-            <button
-              onClick={saveNote}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50"
-            >
-              <Save size={18} />
-              {saving ? 'Saving...' : 'Save'}
-            </button>
+              } else if (e.key === 'Escape') {
+                setNewTitle(note?.metadata.title || noteName || '');
+                setEditingTitle(false);
+              }
+            }}
+            className="font-semibold bg-transparent border-b-2 border-indigo-500 outline-none px-1 text-gray-900 dark:text-white"
+            autoFocus
+          />
+        ) : (
+          <h2 
+            className="font-semibold truncate cursor-pointer hover:text-indigo-500 text-gray-900 dark:text-white"
+            onClick={() => setEditingTitle(true)}
+            title="Click to edit title"
+          >
+            {note?.metadata.title || noteName}
+          </h2>
+        )}
+      </div>
+
+      {/* Editor/Preview Content */}
+      <div className="flex-1 overflow-hidden">
+        {editorMode === 'reading' ? (
+          <div className="h-full overflow-y-auto p-6 bg-white dark:bg-gray-900">
+            <MarkdownPreview content={content} onLinkClick={handleLinkClick} />
           </div>
-        </div>
+        ) : editorMode === 'wysiwyg' ? (
+          <RichTextEditor
+            content={content}
+            onChange={setContent}
+            isDark={isDark}
+          />
+        ) : (
+          <MonacoEditor
+            height="100%"
+            language="markdown"
+            theme={isDark ? 'vs-dark' : 'light'}
+            value={content}
+            onChange={(value) => setContent(value || '')}
+            onMount={(editor, monaco) => {
+              editorRef.current = editor;
+              
+              // Register menu items with proper submenu structure
+              // Format submenu
+              monaco.editor.registerCommand('format.bold', (accessor, ...args) => {
+                const selection = editor.getSelection();
+                if (selection) {
+                  const text = editor.getModel()?.getValueInRange(selection) || '';
+                  editor.executeEdits('', [{
+                    range: selection,
+                    text: `**${text}**`,
+                  }]);
+                }
+              });
 
-        {/* Editor/Preview */}
-        <div className="flex-1 overflow-hidden">
-          {preview ? (
-            <div className="h-full overflow-y-auto p-6">
-              <MarkdownPreview content={content} onLinkClick={handleLinkClick} />
-            </div>
-          ) : (
-            <MonacoEditor
-              height="100%"
-              language="markdown"
-              theme={isDark ? 'vs-dark' : 'light'}
-              value={content}
-              onChange={(value) => setContent(value || '')}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: 'on',
-                wordWrap: 'on',
-                scrollBeyondLastLine: false,
-              }}
-            />
-          )}
-        </div>
+              monaco.editor.registerCommand('format.italic', (accessor, ...args) => {
+                const selection = editor.getSelection();
+                if (selection) {
+                  const text = editor.getModel()?.getValueInRange(selection) || '';
+                  editor.executeEdits('', [{
+                    range: selection,
+                    text: `*${text}*`,
+                  }]);
+                }
+              });
+
+              monaco.editor.registerCommand('format.strikethrough', (accessor, ...args) => {
+                const selection = editor.getSelection();
+                if (selection) {
+                  const text = editor.getModel()?.getValueInRange(selection) || '';
+                  editor.executeEdits('', [{
+                    range: selection,
+                    text: `~~${text}~~`,
+                  }]);
+                }
+              });
+
+              monaco.editor.registerCommand('format.code', (accessor, ...args) => {
+                const selection = editor.getSelection();
+                if (selection) {
+                  const text = editor.getModel()?.getValueInRange(selection) || '';
+                  editor.executeEdits('', [{
+                    range: selection,
+                    text: `\`${text}\``,
+                  }]);
+                }
+              });
+
+              monaco.editor.registerCommand('format.clear', (accessor, ...args) => {
+                const selection = editor.getSelection();
+                if (selection) {
+                  let text = editor.getModel()?.getValueInRange(selection) || '';
+                  text = text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/~~/g, '').replace(/`/g, '');
+                  editor.executeEdits('', [{
+                    range: selection,
+                    text: text,
+                  }]);
+                }
+              });
+
+              // Add actions with submenus
+              editor.addAction({
+                id: 'add-backlink',
+                label: 'Add Link (Backlink)',
+                contextMenuGroupId: '1_modification',
+                contextMenuOrder: 1,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const text = ed.getModel()?.getValueInRange(selection) || '';
+                    ed.executeEdits('', [{
+                      range: selection,
+                      text: `[[${text}]]`,
+                    }]);
+                    // Move cursor inside brackets if no text was selected
+                    if (!text) {
+                      const newSelection = ed.getSelection();
+                      if (newSelection) {
+                        const pos = newSelection.getStartPosition();
+                        ed.setPosition({
+                          lineNumber: pos.lineNumber,
+                          column: pos.column - 2, // Move cursor before ]]
+                        });
+                      }
+                    }
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'add-external-link',
+                label: 'Add External Link',
+                contextMenuGroupId: '1_modification',
+                contextMenuOrder: 2,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const text = ed.getModel()?.getValueInRange(selection) || '';
+                    ed.executeEdits('', [{
+                      range: selection,
+                      text: `[${text}]()`,
+                    }]);
+                    // Move cursor inside () if no text was selected, or after [text] if text was selected
+                    const newSelection = ed.getSelection();
+                    if (newSelection) {
+                      const pos = newSelection.getStartPosition();
+                      if (text) {
+                        // If text was selected, move cursor into () for URL
+                        ed.setPosition({
+                          lineNumber: pos.lineNumber,
+                          column: pos.column - 1, // Move cursor before )
+                        });
+                      } else {
+                        // If no text, move cursor into [] for link text
+                        ed.setPosition({
+                          lineNumber: pos.lineNumber,
+                          column: pos.column - 3, // Move cursor before ]()
+                        });
+                      }
+                    }
+                  }
+                },
+              });
+
+              // Format submenu parent
+              editor.addAction({
+                id: 'format-bold-alt',
+                label: 'Bold',
+                contextMenuGroupId: '2_format',
+                contextMenuOrder: 1,
+                run: () => monaco.editor.getEditors()[0]?.trigger('context', 'format.bold', null),
+              });
+
+              editor.addAction({
+                id: 'format-italic-alt',
+                label: 'Italic',
+                contextMenuGroupId: '2_format',
+                contextMenuOrder: 2,
+                run: () => monaco.editor.getEditors()[0]?.trigger('context', 'format.italic', null),
+              });
+
+              editor.addAction({
+                id: 'format-strikethrough-alt',
+                label: 'Strikethrough',
+                contextMenuGroupId: '2_format',
+                contextMenuOrder: 3,
+                run: () => monaco.editor.getEditors()[0]?.trigger('context', 'format.strikethrough', null),
+              });
+
+              editor.addAction({
+                id: 'format-code-alt',
+                label: 'Inline Code',
+                contextMenuGroupId: '2_format',
+                contextMenuOrder: 4,
+                run: () => monaco.editor.getEditors()[0]?.trigger('context', 'format.code', null),
+              });
+
+              editor.addAction({
+                id: 'format-clear-alt',
+                label: 'Clear Formatting',
+                contextMenuGroupId: '2_format',
+                contextMenuOrder: 5,
+                run: () => monaco.editor.getEditors()[0]?.trigger('context', 'format.clear', null),
+              });
+
+              // Paragraph actions with prefix
+              editor.addAction({
+                id: 'paragraph-bullet-list',
+                label: 'Bullet List',
+                contextMenuGroupId: '3_paragraph',
+                contextMenuOrder: 1,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const position = selection.getStartPosition();
+                    ed.executeEdits('', [{
+                      range: new monaco.Range(position.lineNumber, 1, position.lineNumber, 1),
+                      text: '- ',
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'paragraph-numbered-list',
+                label: 'Numbered List',
+                contextMenuGroupId: '3_paragraph',
+                contextMenuOrder: 2,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const position = selection.getStartPosition();
+                    ed.executeEdits('', [{
+                      range: new monaco.Range(position.lineNumber, 1, position.lineNumber, 1),
+                      text: '1. ',
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'paragraph-task-list',
+                label: 'Task List',
+                contextMenuGroupId: '3_paragraph',
+                contextMenuOrder: 3,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const position = selection.getStartPosition();
+                    ed.executeEdits('', [{
+                      range: new monaco.Range(position.lineNumber, 1, position.lineNumber, 1),
+                      text: '- [ ] ',
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'paragraph-heading1',
+                label: 'Heading 1',
+                contextMenuGroupId: '3_paragraph',
+                contextMenuOrder: 4,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const position = selection.getStartPosition();
+                    ed.executeEdits('', [{
+                      range: new monaco.Range(position.lineNumber, 1, position.lineNumber, 1),
+                      text: '# ',
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'paragraph-heading2',
+                label: 'Heading 2',
+                contextMenuGroupId: '3_paragraph',
+                contextMenuOrder: 5,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const position = selection.getStartPosition();
+                    ed.executeEdits('', [{
+                      range: new monaco.Range(position.lineNumber, 1, position.lineNumber, 1),
+                      text: '## ',
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'paragraph-heading3',
+                label: 'Heading 3',
+                contextMenuGroupId: '3_paragraph',
+                contextMenuOrder: 6,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const position = selection.getStartPosition();
+                    ed.executeEdits('', [{
+                      range: new monaco.Range(position.lineNumber, 1, position.lineNumber, 1),
+                      text: '### ',
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'paragraph-quote',
+                label: 'Quote',
+                contextMenuGroupId: '3_paragraph',
+                contextMenuOrder: 7,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const position = selection.getStartPosition();
+                    ed.executeEdits('', [{
+                      range: new monaco.Range(position.lineNumber, 1, position.lineNumber, 1),
+                      text: '> ',
+                    }]);
+                  }
+                },
+              });
+
+              // Insert actions with prefix
+              editor.addAction({
+                id: 'insert-table',
+                label: 'Table',
+                contextMenuGroupId: '4_insert',
+                contextMenuOrder: 1,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    const table = '\n| Column 1 | Column 2 | Column 3 |\n| --- | --- | --- |\n| Row 1 | Data | Data |\n| Row 2 | Data | Data |\n';
+                    ed.executeEdits('', [{
+                      range: selection,
+                      text: table,
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'insert-hr',
+                label: 'Horizontal Rule',
+                contextMenuGroupId: '4_insert',
+                contextMenuOrder: 2,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    ed.executeEdits('', [{
+                      range: selection,
+                      text: '\n---\n',
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'insert-codeblock',
+                label: 'Code Block',
+                contextMenuGroupId: '4_insert',
+                contextMenuOrder: 3,
+                run: (ed) => {
+                  const selection = ed.getSelection();
+                  if (selection) {
+                    ed.executeEdits('', [{
+                      range: selection,
+                      text: '\n```\ncode here\n```\n',
+                    }]);
+                  }
+                },
+              });
+
+              editor.addAction({
+                id: 'insert-image',
+                label: 'Image',
+                contextMenuGroupId: '4_insert',
+                contextMenuOrder: 4,
+                run: (ed) => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.onchange = async (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) {
+                      const selection = ed.getSelection();
+                      if (selection) {
+                        const pos = selection.getStartPosition();
+                        
+                        // Show loading placeholder
+                        ed.executeEdits('', [{
+                          range: selection,
+                          text: `![Uploading...](uploading)`,
+                        }]);
+                        
+                        try {
+                          // Upload image to backend
+                          const result = await uploadAttachment(file);
+                          
+                          // Replace with actual image link
+                          const model = ed.getModel();
+                          if (model) {
+                            const lineContent = model.getLineContent(pos.lineNumber);
+                            const uploadingIndex = lineContent.indexOf('![Uploading...](uploading)');
+                            if (uploadingIndex !== -1) {
+                              ed.executeEdits('', [{
+                                range: new monaco.Range(
+                                  pos.lineNumber,
+                                  uploadingIndex + 1,
+                                  pos.lineNumber,
+                                  uploadingIndex + '![Uploading...](uploading)'.length + 1
+                                ),
+                                text: `![image](${result.url})`,
+                              }]);
+                            }
+                          }
+                          
+                          // Move cursor to alt text area (between ![])
+                          ed.setPosition({
+                            lineNumber: pos.lineNumber,
+                            column: pos.column + 2,
+                          });
+                        } catch (error) {
+                          console.error('Failed to upload image:', error);
+                          // Replace with error message
+                          const model = ed.getModel();
+                          if (model) {
+                            const lineContent = model.getLineContent(pos.lineNumber);
+                            const uploadingIndex = lineContent.indexOf('![Uploading...](uploading)');
+                            if (uploadingIndex !== -1) {
+                              ed.executeEdits('', [{
+                                range: new monaco.Range(
+                                  pos.lineNumber,
+                                  uploadingIndex + 1,
+                                  pos.lineNumber,
+                                  uploadingIndex + '![Uploading...](uploading)'.length + 1
+                                ),
+                                text: `![Upload failed](error)`,
+                              }]);
+                            }
+                          }
+                          alert('Failed to upload image: ' + (error as Error).message);
+                        }
+                      }
+                    }
+                  };
+                  input.click();
+                },
+              });
+            }}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 14,
+              lineNumbers: 'on',
+              wordWrap: 'on',
+              scrollBeyondLastLine: false,
+            }}
+          />
+        )}
       </div>
 
-      {/* Sidebar - Backlinks & Metadata */}
-      <div className="w-64 border-l border-gray-200 dark:border-gray-700 overflow-y-auto">
-        {/* Project Assignment */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            Projekt
-          </label>
-          <select
-            value={selectedProject}
-            onChange={(e) => updateProject(e.target.value)}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
-          >
-            <option value="">Kein Projekt</option>
-            {projects.map(project => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-          {selectedProject && (
-            <div className="mt-2 px-2 py-1.5 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-900">
-              <p className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1">
-                <span>📁</span>
-                <span className="font-medium">{projects.find(p => p.id === selectedProject)?.name}</span>
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-500 mt-0.5">
-                Wird nur im Frontmatter gespeichert
-              </p>
-            </div>
-          )}
-        </div>
+      {/* Status Bar */}
+      <StatusBar
+        note={note}
+        content={content}
+        backlinksCount={backlinksCount}
+        editorMode={editorMode}
+        onModeChange={setEditorMode}
+        onShowInfo={() => setShowInfoModal(true)}
+      />
 
-        {/* Delete Note Button */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <button
-            onClick={deleteNote}
-            disabled={deleting}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 rounded-lg text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900 transition-colors disabled:opacity-50"
-          >
-            <Trash2 size={16} />
-            {deleting ? 'Wird gelöscht...' : 'Notiz löschen'}
-          </button>
-        </div>
-
-        <Backlinks
+      {/* File Info Modal */}
+      {showInfoModal && (
+        <FileInfoModal
           note={note}
-          onLinkClick={handleLinkClick}
+          onClose={() => setShowInfoModal(false)}
+          onProjectUpdate={updateProject}
+          onDelete={deleteNote}
         />
-      </div>
+      )}
     </div>
   );
 }

@@ -142,3 +142,11 @@ body {
 * {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Monaco Editor - Hide base64 image data line */
+.hidden-line {
+  display: none !important;
+  height: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden !important;
+}

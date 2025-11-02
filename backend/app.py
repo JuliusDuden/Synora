@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from routes import notes, search, graph, tags, auth, projects, tasks, ideas, habits
-from routes import snippets
+from routes import snippets, attachments
 from services.index_service import IndexService
 
 # Configuration
@@ -78,6 +78,7 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(ideas.router, prefix="/api/ideas", tags=["ideas"])
 app.include_router(habits.router, prefix="/api/habits", tags=["habits"])
 app.include_router(snippets.router, prefix="/api/snippets", tags=["snippets"])
+app.include_router(attachments.router, prefix="/api/attachments", tags=["attachments"])
 
 
 @app.get("/")

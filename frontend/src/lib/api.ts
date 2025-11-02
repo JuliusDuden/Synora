@@ -104,8 +104,32 @@ export interface Habit {
 }
 
 class API {
+  // Simple fetch wrapper with retries for transient errors (503, network failures)
+  private async requestWithRetries(input: string, init?: RequestInit, retries: number = 3, backoffMs: number = 250): Promise<Response> {
+    let attempt = 0;
+    while (true) {
+      try {
+        const res = await fetch(input, init);
+        if (res.status === 503 && attempt < retries) {
+          // transient server busy - retry
+          await new Promise(r => setTimeout(r, backoffMs * Math.pow(2, attempt)));
+          attempt++;
+          continue;
+        }
+        return res;
+      } catch (err) {
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, backoffMs * Math.pow(2, attempt)));
+          attempt++;
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
   async getAllNotes(): Promise<NoteList[]> {
-    const res = await fetch(`${API_URL}/api/notes`, {
+    const res = await this.requestWithRetries(`${API_URL}/api/notes`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error('Failed to fetch notes');
@@ -194,7 +218,7 @@ class API {
 
   // Projects API
   async getProjects(): Promise<any[]> {
-    const res = await fetch(`${API_URL}/api/projects`, {
+    const res = await this.requestWithRetries(`${API_URL}/api/projects`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error('Failed to fetch projects');
@@ -378,7 +402,7 @@ class API {
 
   // Snippets API
   async getSnippets(): Promise<any[]> {
-    const res = await fetch(`${API_URL}/api/snippets`, {
+    const res = await this.requestWithRetries(`${API_URL}/api/snippets`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error('Failed to fetch snippets');
@@ -424,6 +448,25 @@ class API {
 }
 
 export const api = new API();
+
+// Attachment upload function
+export async function uploadAttachment(file: File): Promise<{ filename: string; url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/api/attachments/upload`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to upload attachment');
+  }
+
+  return response.json();
+}
 
 /**
  * Return a localStorage key for snippets that is specific to the authenticated user (by JWT 'sub' claim).

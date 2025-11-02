@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import MarkdownIt from 'markdown-it';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 const md = new MarkdownIt({
   html: true,
   linkify: true,
@@ -21,10 +23,18 @@ export default function MarkdownPreview({ content, onLinkClick }: MarkdownPrevie
     if (!containerRef.current) return;
 
     // Process wiki links
-    const processedContent = content.replace(
+    let processedContent = content.replace(
       /\[\[([^\]|]+)(\|([^\]]+))?\]\]/g,
       (match, link, _, alias) => {
         return `<a href="#" data-wiki-link="${link}" class="wiki-link">${alias || link}</a>`;
+      }
+    );
+
+    // Process attachment images: ![alt](attachment:filename) -> actual URL
+    processedContent = processedContent.replace(
+      /!\[([^\]]*)\]\(attachment:([^)]+)\)/g,
+      (match, alt, filename) => {
+        return `![${alt}](${API_URL}/api/attachments/${filename})`;
       }
     );
 
@@ -52,9 +62,36 @@ export default function MarkdownPreview({ content, onLinkClick }: MarkdownPrevie
   }, [content, onLinkClick]);
 
   return (
-    <div
-      ref={containerRef}
-      className="markdown-preview prose dark:prose-invert max-w-none"
-    />
+    <>
+      <style jsx global>{`
+        .markdown-preview ul {
+          list-style-type: disc;
+          padding-left: 1.625em;
+          margin-top: 1.25em;
+          margin-bottom: 1.25em;
+        }
+        .markdown-preview ol {
+          list-style-type: decimal;
+          padding-left: 1.625em;
+          margin-top: 1.25em;
+          margin-bottom: 1.25em;
+        }
+        .markdown-preview li {
+          margin-top: 0.5em;
+          margin-bottom: 0.5em;
+        }
+        .markdown-preview ul ul,
+        .markdown-preview ol ol,
+        .markdown-preview ul ol,
+        .markdown-preview ol ul {
+          margin-top: 0.5em;
+          margin-bottom: 0.5em;
+        }
+      `}</style>
+      <div
+        ref={containerRef}
+        className="markdown-preview prose dark:prose-invert max-w-none"
+      />
+    </>
   );
 }

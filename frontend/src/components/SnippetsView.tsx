@@ -7,6 +7,7 @@ import {
   Image as ImageIcon, Mic, Link2, Home, Search, Bell, 
   Clock, StopCircle, PlayCircle, Pause
 } from 'lucide-react';
+
 import { useTranslation } from '@/lib/useTranslation';
 
 interface Snippet {
@@ -68,6 +69,7 @@ interface SnippetsViewProps {
   onNavigateToNote?: (notePath: string) => void;
   onNavigateToProject?: (projectId: string) => void;
 }
+
 
 export default function SnippetsView({ onNavigateToNote, onNavigateToProject }: SnippetsViewProps) {
   const { t } = useTranslation();
@@ -582,6 +584,23 @@ function SnippetCard({
     setContent(snippet.content);
   }, [snippet.title, snippet.content]);
 
+  // Ensure textarea height matches content on mount and when content changes
+  useEffect(() => {
+    const ta = contentTextareaRef.current;
+    if (ta) {
+      // Reset to auto to correctly measure scrollHeight
+      ta.style.height = 'auto';
+      // Add a small timeout to ensure DOM has updated when called during mount
+      setTimeout(() => {
+        try {
+          ta.style.height = ta.scrollHeight + 'px';
+        } catch (e) {
+          // ignore
+        }
+      }, 0);
+    }
+  }, [content]);
+
   const colorObj = COLORS.find(c => c.value === snippet.color) || COLORS[0];
 
   const handleTitleSave = () => {
@@ -621,6 +640,15 @@ function SnippetCard({
       setCodeContent('');
       setShowCodeDialog(false);
     }
+  };
+
+  // Bullet symbols for nested levels (larger / different shapes for clarity)
+  const BULLET_SYMBOLS = ['●', '○', '◦', '•'];
+  const getBulletForIndent = (indentStr: string) => {
+    // count tabs for indent level
+    const tabs = (indentStr.match(/\t/g) || []).length;
+    const level = Math.max(0, tabs);
+    return BULLET_SYMBOLS[Math.min(level, BULLET_SYMBOLS.length - 1)];
   };
 
   const handleAddLink = () => {
@@ -860,6 +888,92 @@ function SnippetCard({
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onKeyDown={(e) => {
+            // Handle Tab / Shift+Tab to indent/outdent without leaving the textarea
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              e.stopPropagation();
+              const textarea = e.currentTarget as HTMLTextAreaElement;
+              const start = textarea.selectionStart;
+              const end = textarea.selectionEnd;
+              const value = content || '';
+
+              const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+              const lineEndIdx = value.indexOf('\n', end);
+              const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+
+              const block = value.slice(lineStart, lineEnd);
+              const lines = block.split('\n');
+
+              if (e.shiftKey) {
+                // Outdent
+                const removedLens: number[] = [];
+                const newLines = lines.map(l => {
+                  if (l.startsWith('\t')) {
+                    removedLens.push(1);
+                    return l.slice(1);
+                  }
+                  if (l.startsWith('  ')) {
+                    removedLens.push(2);
+                    return l.slice(2);
+                  }
+                  if (l.startsWith(' ')) {
+                    removedLens.push(1);
+                    return l.slice(1);
+                  }
+                  removedLens.push(0);
+                  return l;
+                });
+
+                const newBlock = newLines.join('\n');
+                const before = value.slice(0, lineStart);
+                const after = value.slice(lineEnd);
+                const newValue = before + newBlock + after;
+                setContent(newValue);
+                try { textarea.focus(); } catch (err) {}
+
+                const relStart = start - lineStart;
+                const relEnd = end - lineStart;
+                const prefixesBeforeStart = block.slice(0, relStart).split('\n').length;
+                const prefixesBeforeEnd = block.slice(0, relEnd).split('\n').length;
+                const removedBeforeStart = removedLens.slice(0, prefixesBeforeStart).reduce((a, b) => a + b, 0);
+                const removedBeforeEnd = removedLens.slice(0, prefixesBeforeEnd).reduce((a, b) => a + b, 0);
+
+                setTimeout(() => {
+                  try {
+                    textarea.selectionStart = Math.max(lineStart, start - removedBeforeStart);
+                    textarea.selectionEnd = Math.max(lineStart, end - removedBeforeEnd);
+                    textarea.focus();
+                  } catch (err) {}
+                }, 0);
+              } else {
+                // Indent using a real tab character so indent level maps to bullet types
+                const prefix = '\t';
+                const newLines = lines.map(l => prefix + l);
+                const newBlock = newLines.join('\n');
+                const before = value.slice(0, lineStart);
+                const after = value.slice(lineEnd);
+                const newValue = before + newBlock + after;
+                setContent(newValue);
+                try { textarea.focus(); } catch (err) {}
+
+                const relStart = start - lineStart;
+                const relEnd = end - lineStart;
+                const prefixesBeforeStart = block.slice(0, relStart).split('\n').length;
+                const prefixesBeforeEnd = block.slice(0, relEnd).split('\n').length;
+                const deltaStart = prefixesBeforeStart * prefix.length;
+                const deltaEnd = prefixesBeforeEnd * prefix.length;
+
+                setTimeout(() => {
+                  try {
+                    textarea.selectionStart = start + deltaStart;
+                    textarea.selectionEnd = end + deltaEnd;
+                    textarea.focus();
+                  } catch (err) {}
+                }, 0);
+              }
+
+              return;
+            }
             if (e.key === 'Enter') {
               const textarea = e.currentTarget;
               const cursorPos = textarea.selectionStart;
@@ -868,32 +982,34 @@ function SnippetCard({
               const lines = textBeforeCursor.split('\n');
               const currentLine = lines[lines.length - 1];
               
-              // Check if current line starts with bullet or checkbox
-              // Match both "• text" and just "•" or "• "
-              const bulletMatch = currentLine.match(/^(\s*)•\s*(.*)$/);
+                // Check if current line starts with bullet or checkbox
+              // Match any of our bullet symbols e.g. '●', '○', '◦', '•'
+              const bulletMatch = currentLine.match(/^(\s*)([●○◦•])\s*(.*)$/);
               const checkboxMatch = currentLine.match(/^(\s*)[☐☑]\s*(.*)$/);
               
               if (bulletMatch) {
-                const [, indent, lineContent] = bulletMatch;
+                const [, indent, bulletChar, lineContent] = bulletMatch;
                 if (lineContent.trim() === '') {
                   // Empty bullet line - remove bullet and go to normal text
                   e.preventDefault();
+                  // Remove the bullet symbol regardless of which one it was
                   const newContent = textBeforeCursor.substring(0, textBeforeCursor.lastIndexOf('\n') + 1) + 
-                                    textBeforeCursor.substring(textBeforeCursor.lastIndexOf('\n') + 1).replace(/^\s*•\s*/, '') + 
+                                    textBeforeCursor.substring(textBeforeCursor.lastIndexOf('\n') + 1).replace(/^\s*[●○◦•]\s*/, '') + 
                                     '\n' + textAfterCursor;
                   setContent(newContent);
                   setTimeout(() => {
                     const newPos = textBeforeCursor.substring(0, textBeforeCursor.lastIndexOf('\n') + 1).length + 
-                                   textBeforeCursor.substring(textBeforeCursor.lastIndexOf('\n') + 1).replace(/^\s*•\s*/, '').length + 1;
+                                   textBeforeCursor.substring(textBeforeCursor.lastIndexOf('\n') + 1).replace(/^\s*[●○◦•]\s*/, '').length + 1;
                     textarea.selectionStart = textarea.selectionEnd = newPos;
                   }, 0);
                 } else {
                   // Has content - create new bullet
                   e.preventDefault();
-                  const newContent = textBeforeCursor + '\n' + indent + '• ' + textAfterCursor;
+                  const bullet = getBulletForIndent(indent);
+                  const newContent = textBeforeCursor + '\n' + indent + bullet + ' ' + textAfterCursor;
                   setContent(newContent);
                   setTimeout(() => {
-                    textarea.selectionStart = textarea.selectionEnd = cursorPos + indent.length + 3;
+                    textarea.selectionStart = textarea.selectionEnd = cursorPos + indent.length + bullet.length + 2;
                   }, 0);
                 }
               } else if (checkboxMatch) {
@@ -911,12 +1027,12 @@ function SnippetCard({
                     textarea.selectionStart = textarea.selectionEnd = newPos;
                   }, 0);
                 } else {
-                  // Has content - create new checkbox
+                  // Has content - create new checkbox (keep checkbox symbol)
                   e.preventDefault();
                   const newContent = textBeforeCursor + '\n' + indent + '☐ ' + textAfterCursor;
                   setContent(newContent);
                   setTimeout(() => {
-                    textarea.selectionStart = textarea.selectionEnd = cursorPos + indent.length + 3;
+                    textarea.selectionStart = textarea.selectionEnd = cursorPos + indent.length + 2; // '☐ ' is 2 chars
                   }, 0);
                 }
               }
@@ -1173,29 +1289,38 @@ function SnippetCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              // Insert bullet at cursor position or start of current line
+              // Insert bullet at cursor position or start of current line using same indent/bullet logic as Enter
               const textarea = contentTextareaRef.current;
               if (textarea) {
                 const cursorPos = textarea.selectionStart;
-                const textBefore = content.substring(0, cursorPos);
-                const textAfter = content.substring(cursorPos);
+                const textBefore = (content || '').substring(0, cursorPos);
+                const textAfter = (content || '').substring(cursorPos);
                 const lastNewline = textBefore.lastIndexOf('\n');
                 const currentLineStart = lastNewline + 1;
-                const beforeLine = content.substring(0, currentLineStart);
-                const afterLine = content.substring(currentLineStart);
-                
-                // Add bullet at start of current line if empty, or create new line
+                const beforeLine = (content || '').substring(0, currentLineStart);
+                const afterLine = (content || '').substring(currentLineStart);
+
+                // Determine existing leading whitespace on the current line so we keep the same indent
+                const currentLineEndIdx = ((content || '').indexOf('\n', currentLineStart) === -1) ? (content || '').length : (content || '').indexOf('\n', currentLineStart);
+                const currentLineFull = (content || '').substring(currentLineStart, currentLineEndIdx);
+                const indentMatch = currentLineFull.match(/^(\s*)/);
+                const existingIndent = indentMatch ? indentMatch[1] : '';
+                const bullet = getBulletForIndent(existingIndent);
+
+                // Add bullet at start of current line if cursor is at line start or after a newline, else create new line
                 if (cursorPos === currentLineStart || textBefore.endsWith('\n')) {
-                  setContent(beforeLine + '• ' + afterLine);
+                  // Replace any leading whitespace of the line with the same indent + bullet
+                  const restOfLine = afterLine.substring(existingIndent.length);
+                  setContent(beforeLine + existingIndent + bullet + ' ' + restOfLine);
                   setTimeout(() => {
                     textarea.focus();
-                    textarea.selectionStart = textarea.selectionEnd = currentLineStart + 2;
+                    textarea.selectionStart = textarea.selectionEnd = currentLineStart + existingIndent.length + bullet.length + 2;
                   }, 0);
                 } else {
-                  setContent(textBefore + '\n• ' + textAfter);
+                  setContent(textBefore + '\n' + existingIndent + bullet + ' ' + textAfter);
                   setTimeout(() => {
                     textarea.focus();
-                    textarea.selectionStart = textarea.selectionEnd = cursorPos + 3;
+                    textarea.selectionStart = textarea.selectionEnd = cursorPos + existingIndent.length + bullet.length + 2;
                   }, 0);
                 }
               }
