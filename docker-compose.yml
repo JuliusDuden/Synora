@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
-    container_name: second-brain-backend
+    container_name: synora-backend
     ports:
       - "8000:8000"
     volumes:
@@ -12,21 +10,44 @@ services:
     environment:
       - VAULT_PATH=/app/vault
       - DATABASE_PATH=/app/data/notes.db
-      - CORS_ORIGINS=http://synora.duckdns.org:81,http://synora.duckdns.org,http://localhost:3000
+      - CORS_ORIGINS=http://synora.duckdns.org:81,http://synora.duckdns.org,http://localhost:3000,http://localhost:81
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-key-change-in-production}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   frontend:
     build: 
       context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: http://synora.duckdns.org:81
-    container_name: second-brain-frontend
+    container_name: synora-frontend
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://synora.duckdns.org:81
     depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: synora-nginx
+    ports:
+      - "81:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
       - backend
+      - frontend
     restart: unless-stopped
 
 volumes:

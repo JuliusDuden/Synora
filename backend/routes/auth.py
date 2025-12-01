@@ -20,11 +20,12 @@ from services.auth_service import (
     is_account_locked, calculate_lockout_time
 )
 from services.encryption_service import EncryptionService
+import os
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 security = HTTPBearer()
 
-DB_PATH = "data/notes.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "notes.db")
 
 
 def get_db():

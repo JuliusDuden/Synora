@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Synora",
+    "slug": "synora-mobile",
+    "version": "1.0.5",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#ffffff",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.synora.mobile",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.synora.mobile",
+      "versionCode": 6,
+      "permissions": [
+        "INTERNET"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "usesCleartextTraffic": true
+    },
+    "extra": {
+      "apiUrl": "http://synora.duckdns.org:81",
+      "eas": {
+        "projectId": "6ca7fbbf-dedb-4be0-af12-e7d825281061"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      "./plugins/withAndroidNetworkSecurityConfig"
+    ]
+  }
+}

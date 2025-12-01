@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from models.user import User
 from routes.auth import get_current_user
 import sqlite3
+import os
 
 router = APIRouter()
-DATABASE = 'data/notes.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "notes.db")
 
 class IdeaCreate(BaseModel):
     title: str
@@ -22,7 +23,7 @@ class IdeaUpdate(BaseModel):
     tags: Optional[str] = None
 
 def get_db():
-    conn = sqlite3.connect(DATABASE, timeout=30, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA busy_timeout=30000;")
