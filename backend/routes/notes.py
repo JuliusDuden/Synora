@@ -237,7 +237,7 @@ async def update_note(
             SELECT n.id, n.user_id, si.permission 
             FROM notes n
             JOIN shared_items si ON si.item_type = 'note' AND si.item_id = n.id
-            WHERE n.name = ? AND si.shared_with_user_id = ? AND si.permission = 'edit'
+            WHERE n.name = ? AND si.shared_with_id = ? AND si.permission = 'edit'
         """, (name, current_user.id))
         
         shared_row = cursor.fetchone()
