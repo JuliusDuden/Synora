@@ -594,11 +594,19 @@ class API {
   }
 
   async getSharedNotes(): Promise<any[]> {
-    const res = await fetch(`${API_URL}/api/notes/shared/all`, {
-      headers: getAuthHeaders()
+    const res = await this.requestWithRetries(`${API_URL}/api/notes/shared/all`, {
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json'
+      }
     });
     if (!res.ok) throw new Error('Failed to fetch shared notes');
-    return res.json();
+    const data = await res.json();
+    // Check if the response is an auth error (sometimes returns 200 with error detail)
+    if (data.detail === 'Not authenticated') {
+      throw new Error('Not authenticated');
+    }
+    return Array.isArray(data) ? data : [];
   }
 }
 

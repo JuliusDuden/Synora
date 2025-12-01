@@ -84,8 +84,12 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
       const [notesData, tagsData, sharedNotesData] = await Promise.all([
         api.getAllNotes(),
         api.getTags(),
-        api.getSharedNotes().catch(() => []),
+        api.getSharedNotes().catch((err) => {
+          console.error('Failed to fetch shared notes:', err);
+          return [];
+        }),
       ]);
+      console.log('Shared notes loaded:', sharedNotesData);
       setNotes(notesData);
       setTags(tagsData);
       setSharedNotes(sharedNotesData);
