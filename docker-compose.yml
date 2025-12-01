@@ -34,8 +34,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://synora.duckdns.org:81
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
 
   nginx:
