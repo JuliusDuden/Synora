@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { ReactNode } from 'react';
 
 export const metadata: Metadata = {
-  title: 'Second Brain - Knowledge Management',
+  title: 'Synora - Think Beyond.',
   description: 'Web-based knowledge management system',
 };
 

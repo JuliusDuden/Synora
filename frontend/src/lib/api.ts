@@ -24,6 +24,7 @@ export interface Note {
 }
 
 export interface NoteList {
+  id?: string;
   name: string;
   path: string;
   title?: string;

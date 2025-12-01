@@ -47,6 +47,7 @@ class NoteUpdate(BaseModel):
 
 class NoteList(BaseModel):
     """List of notes"""
+    id: Optional[str] = None
     name: str
     path: str
     title: Optional[str] = None

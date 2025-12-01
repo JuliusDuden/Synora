@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { api, type NoteList } from '@/lib/api';
-import { FileText, Plus, Calendar, Tag, FolderPlus, ArrowUpDown, ChevronDown, ChevronRight, Folder, Trash2, Edit2, Bookmark, Star, FolderOpen, Palette, Move } from 'lucide-react';
+import { FileText, Plus, Calendar, Tag, FolderPlus, ArrowUpDown, ChevronDown, ChevronRight, Folder, Trash2, Edit2, Bookmark, Star, FolderOpen, Palette, Move, Share2 } from 'lucide-react';
+import ShareDialog from './ShareDialog';
 import { useTranslation } from '@/lib/useTranslation';
 
 interface SidebarProps {
@@ -37,6 +38,8 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
   const [bookmarkedItems, setBookmarkedItems] = useState<Set<string>>(new Set());
   const [folderColors, setFolderColors] = useState<{ [key: string]: string }>({});
   const [projects, setProjects] = useState<any[]>([]);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareNote, setShareNote] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -343,6 +346,20 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
     
     setBookmarkedItems(newBookmarks);
     localStorage.setItem('bookmarkedItems', JSON.stringify(Array.from(newBookmarks)));
+    setContextMenu(null);
+  };
+
+  const handleShare = () => {
+    if (!contextMenu || contextMenu.type !== 'note') return;
+    
+    // Find the note to get its ID
+    const note = notes.find(n => n.name === contextMenu.name);
+    if (note?.id) {
+      setShareNote({ id: note.id, name: contextMenu.name });
+      setShareDialogOpen(true);
+    } else {
+      alert('Notiz-ID nicht gefunden. Bitte lade die Seite neu.');
+    }
     setContextMenu(null);
   };
 
@@ -984,6 +1001,17 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
             Umbenennen
           </button>
 
+          {/* Share (only for notes) */}
+          {contextMenu.type === 'note' && (
+            <button
+              onClick={handleShare}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            >
+              <Share2 size={14} />
+              Teilen
+            </button>
+          )}
+
           {/* Bookmark */}
           <button
             onClick={toggleBookmark}
@@ -1043,6 +1071,20 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
             Löschen
           </button>
         </div>
+      )}
+
+      {/* Share Dialog */}
+      {shareNote && (
+        <ShareDialog
+          isOpen={shareDialogOpen}
+          onClose={() => {
+            setShareDialogOpen(false);
+            setShareNote(null);
+          }}
+          itemType="note"
+          itemId={shareNote.id}
+          itemName={shareNote.name}
+        />
       )}
     </div>
   );

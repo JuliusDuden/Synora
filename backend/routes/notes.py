@@ -92,6 +92,7 @@ async def list_notes(current_user: User = Depends(get_current_user)):
     for row in rows:
         tags = json.loads(row["tags"]) if row["tags"] else []
         notes_list.append(NoteList(
+            id=row["id"],
             name=row["name"],
             path=row["path"],
             title=row["title"],
