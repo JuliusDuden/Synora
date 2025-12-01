@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, FileText, FolderKanban, CheckSquare, Lightbulb, Calendar, Network, StickyNote } from 'lucide-react';
+import { Home, FileText, FolderKanban, CheckSquare, Lightbulb, Calendar, Network, StickyNote, Users } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 
 interface NavigationProps {
@@ -19,6 +19,7 @@ export default function Navigation({ currentView, onViewChange }: NavigationProp
     { id: 'tasks', label: t.nav.tasks, icon: CheckSquare },
     { id: 'ideas', label: t.nav.ideas, icon: Lightbulb },
     { id: 'habits', label: t.nav.habits, icon: Calendar },
+    { id: 'connects', label: 'Connects', icon: Users },
     { id: 'graph', label: t.nav.graph, icon: Network },
   ];
   return (

@@ -1,10 +1,11 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Clock, Check, ArrowRight, FolderOpen, Trash2, CheckSquare } from 'lucide-react';
+import { Plus, Clock, Check, ArrowRight, FolderOpen, Trash2, CheckSquare, Share2 } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 import { api } from '@/lib/api';
 import TaskDetailView from './TaskDetailView';
+import ShareDialog from './ShareDialog';
 
 interface Task {
   id?: string;
@@ -24,6 +25,7 @@ interface TaskCardProps {
   onMoveToProgress?: (id: string) => void;
   onDelete: (id: string) => void;
   onClick?: (id: string) => void;
+  onShare?: (task: Task) => void;
   priorityColors: Record<string, string>;
   projects: any[];
 }
@@ -37,6 +39,7 @@ const priorityColors: Record<string, string> = {
 export default function TasksView() {
   const { t } = useTranslation();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [sharedTasks, setSharedTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskProject, setNewTaskProject] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
@@ -44,6 +47,8 @@ export default function TasksView() {
   const [isCreating, setIsCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareTask, setShareTask] = useState<Task | null>(null);
 
   useEffect(() => {
     loadTasks();
@@ -53,8 +58,12 @@ export default function TasksView() {
   const loadTasks = async () => {
     try {
       setLoading(true);
-      const data = await api.getTasks();
-      setTasks(data);
+      const [ownTasks, shared] = await Promise.all([
+        api.getTasks(),
+        api.getSharedTasks().catch(() => [])
+      ]);
+      setTasks(ownTasks);
+      setSharedTasks(shared);
     } catch (error) {
       console.error('Failed to load tasks:', error);
     } finally {
@@ -69,6 +78,11 @@ export default function TasksView() {
     } catch (error) {
       console.error('Failed to load projects:', error);
     }
+  };
+
+  const openShareDialog = (task: Task) => {
+    setShareTask(task);
+    setShareDialogOpen(true);
   };
 
   const createTask = async () => {
@@ -245,6 +259,7 @@ export default function TasksView() {
                   onMoveToProgress={moveToProgress}
                   onDelete={deleteTask}
                   onClick={setSelectedTaskId}
+                  onShare={openShareDialog}
                   priorityColors={priorityColors}
                   projects={projects}
                 />
@@ -270,6 +285,7 @@ export default function TasksView() {
                   onToggle={toggleStatus}
                   onDelete={deleteTask}
                   onClick={setSelectedTaskId}
+                  onShare={openShareDialog}
                   priorityColors={priorityColors}
                   projects={projects}
                 />
@@ -295,6 +311,7 @@ export default function TasksView() {
                   onToggle={toggleStatus}
                   onDelete={deleteTask}
                   onClick={setSelectedTaskId}
+                  onShare={openShareDialog}
                   priorityColors={priorityColors}
                   projects={projects}
                 />
@@ -302,6 +319,38 @@ export default function TasksView() {
             </div>
           </div>
         </div>
+
+        {/* Shared Tasks Section */}
+        {sharedTasks.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Share2 size={18} className="text-indigo-500" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Mit dir geteilte Aufgaben
+              </h2>
+              <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 rounded text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                {sharedTasks.length}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {sharedTasks.map(task => (
+                <div
+                  key={task.id}
+                  className="bg-white dark:bg-gray-900 rounded-lg p-3 border-2 border-indigo-200 dark:border-indigo-800"
+                >
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {task.title}
+                  </p>
+                  {task.description && (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                      {task.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {tasks.length === 0 && !isCreating && (
           <div className="text-center py-16">
@@ -321,11 +370,25 @@ export default function TasksView() {
           </div>
         )}
       </div>
+
+      {/* Share Dialog */}
+      {shareTask && (
+        <ShareDialog
+          isOpen={shareDialogOpen}
+          onClose={() => {
+            setShareDialogOpen(false);
+            setShareTask(null);
+          }}
+          itemType="task"
+          itemId={shareTask.id!}
+          itemName={shareTask.title}
+        />
+      )}
     </div>
   );
 }
 
-function TaskCard({ task, onToggle, onMoveToProgress, onDelete, onClick, priorityColors, projects }: TaskCardProps) {
+function TaskCard({ task, onToggle, onMoveToProgress, onDelete, onClick, onShare, priorityColors, projects }: TaskCardProps) {
   const project = projects.find(p => String(p.id) === String(task.project_id));
   const priorityClass = priorityColors[task.priority] || '';
 
@@ -375,6 +438,18 @@ function TaskCard({ task, onToggle, onMoveToProgress, onDelete, onClick, priorit
               title="Move to In Progress"
             >
               <ArrowRight size={16} />
+            </button>
+          )}
+          {onShare && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onShare(task);
+              }}
+              className="text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+              title="Teilen"
+            >
+              <Share2 size={16} />
             </button>
           )}
           <button

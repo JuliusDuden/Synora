@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Clock, Trash2, ArrowLeft, FileText, CheckSquare, Pin } from 'lucide-react';
+import { Plus, Folder, Clock, Trash2, ArrowLeft, FileText, CheckSquare, Pin, Share2 } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 import { api } from '@/lib/api';
+import ShareDialog from './ShareDialog';
 
 interface Project {
   id: string;
@@ -13,6 +14,8 @@ interface Project {
   color?: string;
   created_at: string;
   modified_at: string;
+  is_shared?: boolean;
+  shared_by?: string;
 }
 
 interface ProjectsViewProps {
@@ -24,10 +27,13 @@ interface ProjectsViewProps {
 export default function ProjectsView({ onProjectSelect, onNoteClick, selectedProjectId: initialProjectId }: ProjectsViewProps) {
   const { t } = useTranslation();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [sharedProjects, setSharedProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '' });
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId || null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareProject, setShareProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,13 +51,23 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
   const loadProjects = async () => {
     try {
       setLoading(true);
-      const data = await api.getProjects();
-      setProjects(data);
+      const [ownProjects, shared] = await Promise.all([
+        api.getProjects(),
+        api.getSharedProjects().catch(() => [])
+      ]);
+      setProjects(ownProjects);
+      setSharedProjects(shared);
     } catch (error) {
       console.error('Failed to load projects:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const openShareDialog = (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShareProject(project);
+    setShareDialogOpen(true);
   };
 
   const loadTasks = async () => {
@@ -228,15 +244,24 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
                   <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
                     <Folder size={20} className="text-gray-600 dark:text-gray-400" />
                   </div>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteProject(project.id);
-                    }}
-                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                  >
-                    <Trash2 size={16} className="text-gray-400 hover:text-red-500" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={(e) => openShareDialog(project, e)}
+                      className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                      title="Projekt teilen"
+                    >
+                      <Share2 size={16} className="text-gray-400 hover:text-indigo-500" />
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteProject(project.id);
+                      }}
+                      className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                    >
+                      <Trash2 size={16} className="text-gray-400 hover:text-red-500" />
+                    </button>
+                  </div>
                 </div>
 
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
@@ -275,6 +300,43 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
           })}
         </div>
 
+        {/* Shared Projects Section */}
+        {sharedProjects.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Share2 size={18} className="text-indigo-500" />
+              Mit dir geteilte Projekte
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sharedProjects.map((project) => (
+                <div
+                  key={project.id}
+                  onClick={() => setSelectedProjectId(project.id)}
+                  className="bg-white dark:bg-gray-900 rounded-lg p-5 border-2 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+                      <Folder size={20} className="text-indigo-500" />
+                    </div>
+                    <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
+                      von {project.shared_by}
+                    </span>
+                  </div>
+
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+                    {project.name}
+                  </h3>
+                  {project.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                      {project.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Empty State */}
         {projects.length === 0 && !isCreating && (
           <div className="text-center py-16">
@@ -294,6 +356,20 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
           </div>
         )}
       </div>
+
+      {/* Share Dialog */}
+      {shareProject && (
+        <ShareDialog
+          isOpen={shareDialogOpen}
+          onClose={() => {
+            setShareDialogOpen(false);
+            setShareProject(null);
+          }}
+          itemType="project"
+          itemId={shareProject.id}
+          itemName={shareProject.name}
+        />
+      )}
     </div>
   );
 }

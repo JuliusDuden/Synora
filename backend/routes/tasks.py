@@ -290,7 +290,54 @@ async def delete_task(
         conn.close()
         raise HTTPException(status_code=404, detail="Task not found")
     
+    # Also delete any shares of this task
+    cursor.execute("""
+        DELETE FROM shared_items 
+        WHERE item_type = 'task' AND item_id = ? AND owner_id = ?
+    """, (task_id, current_user.id))
+    
     conn.commit()
     conn.close()
     
     return {"success": True}
+
+
+@router.get("/shared", response_model=List[Task])
+async def list_shared_tasks(current_user: User = Depends(get_current_user)):
+    """List all tasks shared with the current user"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT t.*, u.username as owner_username, si.permission
+        FROM tasks t
+        JOIN shared_items si ON t.id = si.item_id AND si.item_type = 'task'
+        JOIN users u ON t.user_id = u.id
+        WHERE si.shared_with_id = ?
+        ORDER BY t.due_date ASC, t.priority DESC
+    """, (current_user.id,))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    tasks = []
+    for row in rows:
+        row_dict = dict(row)
+        tasks.append(Task(
+            id=row_dict["id"],
+            title=row_dict["title"],
+            description=row_dict["description"],
+            completed=bool(row_dict["completed"]),
+            priority=row_dict["priority"],
+            due_date=row_dict["due_date"],
+            project_id=row_dict["project_id"],
+            created_at=row_dict["created_at"],
+            modified_at=row_dict["modified_at"],
+            tags=json.loads(row_dict["tags"]) if row_dict.get("tags") else None,
+            subtasks=json.loads(row_dict["subtasks"]) if row_dict.get("subtasks") else None,
+            reminder=row_dict.get("reminder"),
+            favorite=bool(row_dict.get("favorite", 0)),
+            linked_notes=json.loads(row_dict["linked_notes"]) if row_dict.get("linked_notes") else None
+        ))
+    
+    return tasks

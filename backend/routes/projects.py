@@ -202,7 +202,42 @@ async def delete_project(
         conn.close()
         raise HTTPException(status_code=404, detail="Project not found")
     
+    # Also delete any shares of this project
+    cursor.execute("""
+        DELETE FROM shared_items 
+        WHERE item_type = 'project' AND item_id = ? AND owner_id = ?
+    """, (project_id, current_user.id))
+    
     conn.commit()
     conn.close()
     
     return {"success": True}
+
+
+@router.get("/shared", response_model=List[Project])
+async def list_shared_projects(current_user: User = Depends(get_current_user)):
+    """List all projects shared with the current user"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT p.*, u.username as owner_username, si.permission
+        FROM projects p
+        JOIN shared_items si ON p.id = si.item_id AND si.item_type = 'project'
+        JOIN users u ON p.user_id = u.id
+        WHERE si.shared_with_id = ?
+        ORDER BY p.modified_at DESC
+    """, (current_user.id,))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    result = []
+    for row in rows:
+        project_dict = dict(row)
+        project_dict['shared_by'] = row['owner_username']
+        project_dict['permission'] = row['permission']
+        project_dict['is_shared'] = True
+        result.append(project_dict)
+    
+    return result

@@ -360,3 +360,36 @@ async def get_backlinks(name: str, current_user: User = Depends(get_current_user
     """Get backlinks for a note (simplified - returns empty for now)"""
     # TODO: Implement backlinks tracking in database
     return []
+
+
+@router.get("/shared/all", response_model=List[NoteList])
+async def list_shared_notes(current_user: User = Depends(get_current_user)):
+    """List all notes shared with the current user"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT n.id, n.name, n.path, n.title, n.project, n.tags, 
+               n.created_at, n.modified_at, u.username as owner_username, si.permission
+        FROM notes n
+        JOIN shared_items si ON n.id = si.item_id AND si.item_type = 'note'
+        JOIN users u ON n.user_id = u.id
+        WHERE si.shared_with_id = ?
+        ORDER BY n.modified_at DESC
+    """, (current_user.id,))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    notes_list = []
+    for row in rows:
+        tags = json.loads(row["tags"]) if row["tags"] else []
+        notes_list.append(NoteList(
+            name=row["name"],
+            path=row["path"],
+            title=row["title"],
+            project=row["project"],
+            tags=tags
+        ))
+    
+    return notes_list

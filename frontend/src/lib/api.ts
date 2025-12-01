@@ -445,6 +445,160 @@ class API {
     });
     if (!res.ok) throw new Error('Failed to delete snippet');
   }
+
+  // ============= Connects API =============
+  
+  async searchUsers(query: string): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/connects/users/search?q=${encodeURIComponent(query)}`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to search users');
+    return res.json();
+  }
+
+  async sendConnectRequest(email?: string, username?: string): Promise<any> {
+    const res = await fetch(`${API_URL}/api/connects/request`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ email, username }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to send connect request');
+    }
+    return res.json();
+  }
+
+  async getIncomingRequests(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/connects/requests/incoming`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch incoming requests');
+    return res.json();
+  }
+
+  async getOutgoingRequests(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/connects/requests/outgoing`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch outgoing requests');
+    return res.json();
+  }
+
+  async acceptConnectRequest(requestId: string): Promise<any> {
+    const res = await fetch(`${API_URL}/api/connects/requests/${requestId}/accept`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to accept connect request');
+    return res.json();
+  }
+
+  async rejectConnectRequest(requestId: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/connects/requests/${requestId}/reject`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to reject connect request');
+  }
+
+  async cancelConnectRequest(requestId: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/connects/requests/${requestId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to cancel connect request');
+  }
+
+  async getConnects(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/connects`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch connects');
+    return res.json();
+  }
+
+  async removeConnect(connectId: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/connects/${connectId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to remove connect');
+  }
+
+  // ============= Sharing API =============
+  
+  async shareItem(itemType: string, itemId: string, connectIds: string[], permission: string = 'view'): Promise<any> {
+    const res = await fetch(`${API_URL}/api/connects/share/${itemType}/${itemId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ connect_ids: connectIds, permission }),
+    });
+    if (!res.ok) throw new Error('Failed to share item');
+    return res.json();
+  }
+
+  async unshareItem(itemType: string, itemId: string, connectId: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/connects/share/${itemType}/${itemId}/${connectId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to unshare item');
+  }
+
+  async getItemShares(itemType: string, itemId: string): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/connects/shared/${itemType}/${itemId}`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to get item shares');
+    return res.json();
+  }
+
+  async getItemsSharedWithMe(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/connects/shared/with-me`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to get shared items');
+    return res.json();
+  }
+
+  async getItemsSharedByMe(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/connects/shared/by-me`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to get shared items');
+    return res.json();
+  }
+
+  async getSharedProjects(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/projects/shared`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch shared projects');
+    return res.json();
+  }
+
+  async getSharedTasks(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/tasks/shared`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch shared tasks');
+    return res.json();
+  }
+
+  async getSharedNotes(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/api/notes/shared/all`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch shared notes');
+    return res.json();
+  }
 }
 
 export const api = new API();

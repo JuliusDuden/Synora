@@ -14,6 +14,7 @@ import IdeasView from '@/components/IdeasView';
 import HabitsView from '@/components/HabitsView';
 import SettingsView from '@/components/SettingsView';
 import SnippetsView from '@/components/SnippetsView';
+import ConnectsView from '@/components/ConnectsView';
 import SearchBar from '@/components/SearchBar';
 import NewNoteDialog from '@/components/NewNoteDialog';
 import { Menu, Search, Moon, Sun } from 'lucide-react';
@@ -205,6 +206,8 @@ function MainApp() {
         return <IdeasView />;
       case 'habits':
         return <HabitsView />;
+      case 'connects':
+        return <ConnectsView />;
       case 'settings':
         return <SettingsView />;
       default:
