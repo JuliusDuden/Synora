@@ -156,12 +156,25 @@ async def get_note(name: str, current_user: User = Depends(get_current_user)):
     
     # If not found, try to get shared note
     if not row:
+        print(f"[DEBUG] Note '{name}' not found for user {current_user.id}, checking shared...")
         cursor.execute("""
             SELECT n.*, si.permission FROM notes n
             JOIN shared_items si ON n.id = si.item_id AND si.item_type = 'note'
             WHERE n.name = ? AND si.shared_with_id = ?
         """, (name, current_user.id))
         row = cursor.fetchone()
+        if row:
+            print(f"[DEBUG] Found shared note: {row['name']}")
+        else:
+            # Debug: show what shared items exist for this user
+            cursor.execute("""
+                SELECT n.name, n.id, si.shared_with_id 
+                FROM notes n 
+                JOIN shared_items si ON n.id = si.item_id 
+                WHERE si.shared_with_id = ?
+            """, (current_user.id,))
+            shared = cursor.fetchall()
+            print(f"[DEBUG] Available shared notes for user: {[dict(s) for s in shared]}")
     
     conn.close()
     
