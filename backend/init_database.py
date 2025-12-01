@@ -35,11 +35,15 @@ def init_database():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE,
-                password_hash TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                username TEXT NOT NULL,
+                hashed_password TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                is_2fa_enabled INTEGER DEFAULT 0,
                 totp_secret TEXT,
-                totp_enabled INTEGER DEFAULT 0,
+                encryption_salt TEXT,
+                failed_login_attempts INTEGER DEFAULT 0,
+                locked_until TEXT,
                 created_at TEXT NOT NULL,
                 last_login TEXT,
                 settings TEXT DEFAULT '{}'
@@ -377,6 +381,10 @@ def add_missing_columns():
             ('reminder', 'TEXT'),
         ],
         'users': [
+            ('email', 'TEXT'),
+            ('hashed_password', 'TEXT'),
+            ('is_active', 'INTEGER DEFAULT 1'),
+            ('is_2fa_enabled', 'INTEGER DEFAULT 0'),
             ('encryption_salt', 'TEXT'),
             ('failed_login_attempts', 'INTEGER DEFAULT 0'),
             ('locked_until', 'TEXT'),
