@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api, type NoteList } from '@/lib/api';
-import { FileText, Plus, Calendar, Tag, FolderPlus, ArrowUpDown, ChevronDown, ChevronRight, Folder, Trash2, Edit2, Bookmark, Star, FolderOpen, Palette, Move, Share2 } from 'lucide-react';
+import { FileText, Plus, Calendar, Tag, FolderPlus, ArrowUpDown, ChevronDown, ChevronRight, Folder, Trash2, Edit2, Bookmark, Star, FolderOpen, Palette, Move, Share2, Users } from 'lucide-react';
 import ShareDialog from './ShareDialog';
 import { useTranslation } from '@/lib/useTranslation';
 
@@ -15,6 +15,7 @@ interface SidebarProps {
 export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: SidebarProps) {
   const { t } = useTranslation();
   const [notes, setNotes] = useState<NoteList[]>([]);
+  const [sharedNotes, setSharedNotes] = useState<any[]>([]);
   const [tags, setTags] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
@@ -80,12 +81,14 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
 
   const loadData = async () => {
     try {
-      const [notesData, tagsData] = await Promise.all([
+      const [notesData, tagsData, sharedNotesData] = await Promise.all([
         api.getAllNotes(),
         api.getTags(),
+        api.getSharedNotes().catch(() => []),
       ]);
       setNotes(notesData);
       setTags(tagsData);
+      setSharedNotes(sharedNotesData);
     } catch (error) {
       console.error('Failed to load sidebar data:', error);
     } finally {
@@ -698,8 +701,13 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                       <FileText size={14} className="mt-0.5 flex-shrink-0" />
                       {isNoteBookmarked && <Star size={12} className="mt-0.5 fill-yellow-500 text-yellow-500 flex-shrink-0" />}
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">
-                          {note.title || note.name.split('/').pop()}
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium truncate flex-1">
+                            {note.title || note.name.split('/').pop()}
+                          </span>
+                          {(note as any).is_shared && (
+                            <Users size={12} className={`flex-shrink-0 ${currentNote === note.name ? 'text-white/70' : 'text-indigo-500'}`} />
+                          )}
                         </div>
                         {note.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
@@ -921,8 +929,13 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                     <FileText size={14} className="mt-0.5 flex-shrink-0" />
                     {isNoteBookmarked && <Star size={12} className="mt-0.5 fill-yellow-500 text-yellow-500 flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">
-                        {note.title || note.name}
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium truncate flex-1">
+                          {note.title || note.name}
+                        </span>
+                        {(note as any).is_shared && (
+                          <Users size={12} className={`flex-shrink-0 ${currentNote === note.name ? 'text-white/70' : 'text-indigo-500'}`} />
+                        )}
                       </div>
                       {note.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -948,6 +961,51 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
             
             {/* Folders - using recursive rendering */}
             {topLevelFolders.map(folder => renderFolder(folder))}
+
+            {/* Shared Notes Section */}
+            {sharedNotes.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                  <Users size={14} />
+                  Mit dir geteilt
+                </div>
+                {sharedNotes.map((note) => (
+                  <button
+                    key={`shared-${note.name}`}
+                    onClick={() => onNoteSelect(note.name)}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm ${
+                      currentNote === note.name
+                        ? 'bg-indigo-500 text-white'
+                        : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <FileText size={14} className="mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium truncate flex-1">
+                            {note.title || note.name}
+                          </span>
+                          <Users size={12} className={`flex-shrink-0 ${currentNote === note.name ? 'text-white/70' : 'text-indigo-500'}`} />
+                        </div>
+                        {note.owner_username && (
+                          <div className={`text-xs mt-0.5 flex items-center gap-1 ${currentNote === note.name ? 'text-white/70' : 'text-gray-500'}`}>
+                            <span>von {note.owner_username}</span>
+                            <span className={`px-1 rounded ${
+                              note.permission === 'edit' 
+                                ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                            }`}>
+                              {note.permission === 'edit' ? 'bearbeiten' : 'ansehen'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

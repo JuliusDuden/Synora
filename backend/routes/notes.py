@@ -105,16 +105,27 @@ async def list_notes(current_user: User = Depends(get_current_user)):
 
 @router.get("/{name:path}", response_model=Note)
 async def get_note(name: str, current_user: User = Depends(get_current_user)):
-    """Get a specific note for current user"""
+    """Get a specific note for current user or shared with user"""
     conn = get_db()
     cursor = conn.cursor()
     
+    # First try to get own note
     cursor.execute("""
         SELECT * FROM notes 
         WHERE user_id = ? AND name = ?
     """, (current_user.id, name))
     
     row = cursor.fetchone()
+    
+    # If not found, try to get shared note
+    if not row:
+        cursor.execute("""
+            SELECT n.*, si.permission FROM notes n
+            JOIN shared_items si ON n.id = si.item_id AND si.item_type = 'note'
+            WHERE n.name = ? AND si.shared_with_id = ?
+        """, (name, current_user.id))
+        row = cursor.fetchone()
+    
     conn.close()
     
     if not row:
@@ -206,20 +217,38 @@ async def update_note(
     note_data: NoteUpdate, 
     current_user: User = Depends(get_current_user)
 ):
-    """Update an existing note for current user"""
+    """Update an existing note for current user or shared note with edit permission"""
     conn = get_db()
     cursor = conn.cursor()
     
-    # Check if note exists
+    # Check if note exists (own note)
     cursor.execute("""
-        SELECT id FROM notes 
+        SELECT id, user_id FROM notes 
         WHERE user_id = ? AND name = ?
     """, (current_user.id, name))
     
     row = cursor.fetchone()
+    is_shared_note = False
+    owner_id = None
+    
     if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Note not found")
+        # Check if it's a shared note with edit permission
+        cursor.execute("""
+            SELECT n.id, n.user_id, si.permission 
+            FROM notes n
+            JOIN shared_items si ON si.item_type = 'note' AND si.item_id = n.id
+            WHERE n.name = ? AND si.shared_with_user_id = ? AND si.permission = 'edit'
+        """, (name, current_user.id))
+        
+        shared_row = cursor.fetchone()
+        if not shared_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Note not found or no edit permission")
+        
+        is_shared_note = True
+        owner_id = shared_row[1]
+    else:
+        owner_id = row[1]
     
     now = datetime.utcnow().isoformat()
     
@@ -228,6 +257,11 @@ async def update_note(
     
     # If renaming
     if note_data.name and note_data.name != name:
+        # Shared notes cannot be renamed
+        if is_shared_note:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Cannot rename shared notes")
+        
         # Check if new name already exists
         cursor.execute("""
             SELECT id FROM notes 
@@ -249,12 +283,14 @@ async def update_note(
         final_name = note_data.name
     else:
         # Just update content and metadata
+        # Use owner_id for shared notes, current_user.id for own notes
+        update_user_id = owner_id if is_shared_note else current_user.id
         cursor.execute("""
             UPDATE notes 
             SET content = ?, title = ?, project = ?, tags = ?, modified_at = ?
             WHERE user_id = ? AND name = ?
         """, (note_data.content, metadata['title'], metadata['project'], 
-              json.dumps(metadata['tags']), now, current_user.id, name))
+              json.dumps(metadata['tags']), now, update_user_id, name))
         
         final_name = name
     
@@ -363,7 +399,7 @@ async def get_backlinks(name: str, current_user: User = Depends(get_current_user
     return []
 
 
-@router.get("/shared/all", response_model=List[NoteList])
+@router.get("/shared/all")
 async def list_shared_notes(current_user: User = Depends(get_current_user)):
     """List all notes shared with the current user"""
     conn = get_db()
@@ -385,12 +421,16 @@ async def list_shared_notes(current_user: User = Depends(get_current_user)):
     notes_list = []
     for row in rows:
         tags = json.loads(row["tags"]) if row["tags"] else []
-        notes_list.append(NoteList(
-            name=row["name"],
-            path=row["path"],
-            title=row["title"],
-            project=row["project"],
-            tags=tags
-        ))
+        notes_list.append({
+            "id": row["id"],
+            "name": row["name"],
+            "path": row["path"],
+            "title": row["title"],
+            "project": row["project"],
+            "tags": tags,
+            "owner_username": row["owner_username"],
+            "permission": row["permission"],
+            "is_shared": True
+        })
     
     return notes_list
