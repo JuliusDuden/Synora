@@ -7,11 +7,11 @@ services:
     volumes:
       - ./backend/vault:/app/vault
       - ./backend/data:/app/data
+    env_file:
+      - .env
     environment:
       - VAULT_PATH=/app/vault
       - DATABASE_PATH=/app/data/notes.db
-      - CORS_ORIGINS=http://synora.duckdns.org:81,http://synora.duckdns.org,http://localhost:3000,http://localhost:81
-      - JWT_SECRET=${JWT_SECRET:-your-super-secret-key-change-in-production}
       - HOST=0.0.0.0
       - PORT=8000
       - DEBUG=false
