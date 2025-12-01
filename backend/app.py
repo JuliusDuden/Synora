@@ -21,7 +21,24 @@ from services.index_service import IndexService
 # Configuration
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "./vault"))
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", "./data/notes.db"))
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+
+# CORS Origins - allow all for development, or specific origins from env
+_cors_env = os.getenv("CORS_ORIGINS", "")
+if _cors_env:
+    CORS_ORIGINS = [origin.strip() for origin in _cors_env.split(",") if origin.strip()]
+else:
+    CORS_ORIGINS = ["*"]  # Allow all if not specified
+
+# Always include common development origins
+CORS_ORIGINS.extend([
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://192.168.178.247:3000",
+    "http://synora.duckdns.org:81",
+    "http://synora.duckdns.org",
+])
+# Remove duplicates
+CORS_ORIGINS = list(set(CORS_ORIGINS))
 
 # Ensure directories exist
 VAULT_PATH.mkdir(parents=True, exist_ok=True)
