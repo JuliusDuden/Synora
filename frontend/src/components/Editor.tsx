@@ -211,6 +211,37 @@ export default function Editor({ noteName, onNoteChange, onNoteDeleted }: Editor
       setEditingTitle(false);
       setBacklinksCount(data.backlinks?.length || 0);
     } catch (error) {
+      const status = typeof error === 'object' && error !== null && 'status' in error
+        ? (error as { status?: number }).status
+        : undefined;
+
+      if (status === 404 && name === 'Welcome') {
+        try {
+          await api.createNote(name, `---\ntitle: ${name}\n---\n\n`);
+          const created = await api.getNote(name);
+          setNote(created);
+
+          let cleanContent = created.content;
+          if (cleanContent.startsWith('---')) {
+            const lines = cleanContent.split('\n');
+            const endIndex = lines.findIndex((line, idx) => idx > 0 && line.trim() === '---');
+            if (endIndex > 0) {
+              cleanContent = lines.slice(endIndex + 1).join('\n').trimStart();
+            }
+          }
+
+          setContent(cleanContent);
+          setNewTitle(created.metadata.title || name);
+          setSelectedProject(created.metadata.project || '');
+          noteNameRef.current = name;
+          setEditingTitle(false);
+          setBacklinksCount(created.backlinks?.length || 0);
+          return;
+        } catch (createError) {
+          console.error('Failed to create default welcome note:', createError);
+        }
+      }
+
       console.error('Failed to load note:', error);
     } finally {
       setLoading(false);

@@ -10,6 +10,7 @@ interface User {
   id: string;
   email: string;
   username: string;
+  avatar_url?: string | null;
   is_2fa_enabled: boolean;
   encryption_salt?: string;
 }
@@ -43,8 +44,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Verify token is still valid
       verifyToken(storedToken);
     }
+
+    const handleProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { user?: User } | undefined;
+      if (detail?.user) {
+        setUser(detail.user);
+        localStorage.setItem('auth_user', JSON.stringify(detail.user));
+      }
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdated as EventListener);
     
     setIsLoading(false);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdated as EventListener);
+    };
   }, []);
 
   const verifyToken = async (token: string) => {

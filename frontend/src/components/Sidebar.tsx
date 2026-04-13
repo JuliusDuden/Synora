@@ -35,6 +35,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
     name: string 
   } | null>(null);
   const [renamingItem, setRenamingItem] = useState<string | null>(null);
+  const [renamingType, setRenamingType] = useState<'note' | 'folder' | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [bookmarkedItems, setBookmarkedItems] = useState<Set<string>>(new Set());
   const [folderColors, setFolderColors] = useState<{ [key: string]: string }>({});
@@ -262,6 +263,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
   const handleRename = () => {
     if (contextMenu) {
       setRenamingItem(contextMenu.name);
+      setRenamingType(contextMenu.type);
       setRenameValue(contextMenu.name.split('/').pop() || contextMenu.name);
       setContextMenu(null);
     }
@@ -279,7 +281,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
         ? [...parts.slice(0, -1), renameValue.trim()].join('/')
         : renameValue.trim();
 
-      if (contextMenu?.type === 'note') {
+      if (renamingType === 'note') {
         const noteData = await api.getNote(renamingItem);
         await api.createNote(newName, noteData.content);
         await api.deleteNote(renamingItem);
@@ -302,6 +304,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
       alert('Fehler beim Umbenennen');
     } finally {
       setRenamingItem(null);
+      setRenamingType(null);
       setRenameValue('');
     }
   };
@@ -627,7 +630,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                 e.stopPropagation();
                 toggleFolder(folderPath);
               }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors relative z-10"
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white/55 dark:hover:bg-slate-800/55 rounded-lg transition-colors relative z-10"
             >
               {expandedFolders.has(folderPath) ? (
                 <ChevronDown size={14} className="flex-shrink-0" />
@@ -697,8 +700,8 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                     style={{ marginLeft: `${(level + 1) * 12}px` }}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm ${
                       currentNote === note.name
-                        ? 'bg-indigo-500 text-white'
-                        : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100'
+                        ? 'bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900'
+                        : 'hover:bg-white/55 dark:hover:bg-slate-800/55 text-gray-900 dark:text-gray-100'
                     } ${draggedItem?.name === note.name ? 'opacity-50' : ''}`}
                   >
                     <div className="flex items-start gap-2">
@@ -742,9 +745,9 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-800">
+    <div className="h-full flex flex-col bg-transparent">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-white/45 dark:border-slate-700/45">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
           Notes
         </h2>
@@ -753,21 +756,21 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
           <button
             onClick={onCreateNote}
             title="New Note"
-            className="flex-1 flex items-center justify-center p-2.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+            className="flex-1 flex items-center justify-center p-2.5 rounded-lg ui-button-primary"
           >
             <Plus size={18} />
           </button>
           <button
             onClick={createDaily}
             title="Daily Note"
-            className="flex-1 flex items-center justify-center p-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="flex-1 flex items-center justify-center p-2.5 rounded-lg ui-button-ghost"
           >
             <Calendar size={18} />
           </button>
           <button
             onClick={createFolder}
             title="New Folder"
-            className="flex-1 flex items-center justify-center p-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="flex-1 flex items-center justify-center p-2.5 rounded-lg ui-button-ghost"
           >
             <FolderPlus size={18} />
           </button>
@@ -775,13 +778,13 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
       </div>
 
       {/* Filter and Sort */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-2">
+      <div className="p-4 border-b border-white/45 dark:border-slate-700/45 space-y-2">
         <input
           type="text"
           placeholder={t.notes.filterPlaceholder}
           value={filter}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilter(e.target.value)}
-          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full px-3 py-2 text-sm rounded-lg ui-input"
         />
         
         {/* Sort and Expand Buttons */}
@@ -790,7 +793,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
           <div className="relative flex-1">
             <button
               onClick={() => setShowSortMenu(!showSortMenu)}
-              className="w-full flex items-center justify-center gap-1 px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="w-full flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg ui-button-ghost"
             >
               <ArrowUpDown size={14} />
               Sort
@@ -802,7 +805,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                   className="fixed inset-0 z-10" 
                   onClick={() => setShowSortMenu(false)}
                 />
-                <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20">
+                <div className="absolute top-full left-0 mt-1 w-full ui-surface rounded-lg shadow-lg z-20">
                   <button
                     onClick={() => { setSortBy('name-asc'); setShowSortMenu(false); }}
                     className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${sortBy === 'name-asc' ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400' : ''}`}
@@ -835,7 +838,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
           {/* Expand/Collapse All */}
           <button
             onClick={toggleExpandAll}
-            className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-lg ui-button-ghost"
           >
             {expandAll ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             {expandAll ? 'Collapse' : 'Expand'}
@@ -907,7 +910,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                       onChange={(e) => setRenameValue(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') confirmRename();
-                        else if (e.key === 'Escape') setRenamingItem(null);
+                        else if (e.key === 'Escape') { setRenamingItem(null); setRenamingType(null); }
                       }}
                       onBlur={confirmRename}
                       autoFocus
@@ -925,8 +928,8 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                   onContextMenu={(e) => handleContextMenu(e, 'note', note.name)}
                   className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm ${
                     currentNote === note.name
-                      ? 'bg-indigo-500 text-white'
-                      : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100'
+                      ? 'bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900'
+                      : 'hover:bg-white/55 dark:hover:bg-slate-800/55 text-gray-900 dark:text-gray-100'
                   } ${draggedItem?.name === note.name ? 'opacity-50' : ''}`}
                 >
                   <div className="flex items-start gap-2">
@@ -968,7 +971,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
 
             {/* Shared Notes Section */}
             {sharedNotes.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-4 pt-4 border-t border-white/45 dark:border-slate-700/45">
                 <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                   <Users size={14} />
                   Mit dir geteilt
@@ -979,8 +982,8 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                     onClick={() => onNoteSelect(note.name)}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm ${
                       currentNote === note.name
-                        ? 'bg-indigo-500 text-white'
-                        : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100'
+                        ? 'bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900'
+                        : 'hover:bg-white/55 dark:hover:bg-slate-800/55 text-gray-900 dark:text-gray-100'
                     }`}
                   >
                     <div className="flex items-start gap-2">
@@ -1015,10 +1018,10 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
       </div>
 
       {/* Tags Section - Collapsible */}
-      <div className="border-t border-gray-200 dark:border-gray-700">
+      <div className="border-t border-white/45 dark:border-slate-700/45">
         <button
           onClick={() => setShowTagsSection(!showTagsSection)}
-          className="w-full p-4 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="w-full p-4 flex items-center justify-between hover:bg-white/55 dark:hover:bg-slate-800/55 transition-colors"
         >
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
             <Tag size={14} />
@@ -1050,7 +1053,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
       {/* Context Menu */}
       {contextMenu && (
         <div
-          className="fixed bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-48"
+          className="fixed ui-surface rounded-lg shadow-xl py-1 z-50 min-w-48"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1085,7 +1088,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
 
           {/* Folder Color (only for folders) */}
           {contextMenu.type === 'folder' && (
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1">
+            <div className="border-t border-white/45 dark:border-slate-700/45 my-1">
               <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">Ordnerfarbe</div>
               <div className="px-4 pb-2 flex gap-2">
                 {['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'].map(color => (
@@ -1108,7 +1111,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
 
           {/* Assign Project (only for notes) */}
           {contextMenu.type === 'note' && projects.length > 0 && (
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1">
+            <div className="border-t border-white/45 dark:border-slate-700/45 my-1">
               <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">Projekt zuweisen</div>
               <div className="max-h-32 overflow-y-auto">
                 {projects.map(project => (
@@ -1128,7 +1131,7 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
           {/* Delete */}
           <button
             onClick={handleDelete}
-            className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-2 border-t border-gray-200 dark:border-gray-700"
+            className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2 border-t border-white/45 dark:border-slate-700/45"
           >
             <Trash2 size={14} />
             Löschen

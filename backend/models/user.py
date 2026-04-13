@@ -28,6 +28,7 @@ class User(UserBase):
     created_at: datetime
     is_active: bool = True
     is_2fa_enabled: bool = False
+    avatar_url: Optional[str] = None
     totp_secret: Optional[str] = None  # TOTP secret for 2FA
     encryption_salt: Optional[str] = None  # Salt for E2E encryption key derivation
     failed_login_attempts: int = 0

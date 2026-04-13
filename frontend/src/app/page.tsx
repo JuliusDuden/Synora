@@ -12,6 +12,7 @@ import ProjectsView from '@/components/ProjectsView';
 import TasksView from '@/components/TasksView';
 import IdeasView from '@/components/IdeasView';
 import HabitsView from '@/components/HabitsView';
+import CalendarView from '@/components/CalendarView';
 import SettingsView from '@/components/SettingsView';
 import SnippetsView from '@/components/SnippetsView';
 import ConnectsView from '@/components/ConnectsView';
@@ -20,6 +21,80 @@ import NewNoteDialog from '@/components/NewNoteDialog';
 import { Menu, Search, Moon, Sun, Plus, Settings, LogOut } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/useTranslation';
+import {
+  GOOGLE_AUTO_SYNC_KEY,
+  clearGoogleAuth,
+  isGoogleTokenValid,
+  readGoogleAuth,
+  syncGooglePrimaryCalendar,
+} from '@/lib/googleCalendarSync';
+
+type DesignPreset = 'aurora' | 'graphite' | 'forest' | 'sunset';
+type GlassLevel = 'soft' | 'balanced' | 'strong';
+
+const THEME_PRESETS: Record<DesignPreset, any> = {
+  aurora: {
+    light: { background: '#eef2f8', foreground: '#111827', sidebar: '#e9eef6', brand: ['#1f7cff', '#36c1ff', '#9be8ff'], stroke: 'rgba(255, 255, 255, 0.62)' },
+    dark: { background: '#0a1323', foreground: '#e7eefc', sidebar: '#0d1b33', brand: ['#71a7ff', '#69ddff', '#86f4c3'], stroke: 'rgba(192, 210, 240, 0.28)' },
+  },
+  graphite: {
+    light: { background: '#edf0f4', foreground: '#111827', sidebar: '#e6ebf1', brand: ['#4f6fff', '#7d8cff', '#c2ccff'], stroke: 'rgba(255, 255, 255, 0.6)' },
+    dark: { background: '#0c111c', foreground: '#e8edf7', sidebar: '#11182a', brand: ['#8aa0ff', '#6cb8ff', '#9de4ff'], stroke: 'rgba(190, 205, 235, 0.26)' },
+  },
+  forest: {
+    light: { background: '#edf6f2', foreground: '#10211b', sidebar: '#e1f1e8', brand: ['#0ea5a2', '#34d399', '#b7f7d6'], stroke: 'rgba(255, 255, 255, 0.58)' },
+    dark: { background: '#091813', foreground: '#e4faf2', sidebar: '#0d241d', brand: ['#2dd4bf', '#34d399', '#a7f3d0'], stroke: 'rgba(180, 225, 206, 0.26)' },
+  },
+  sunset: {
+    light: { background: '#f6efe8', foreground: '#24130d', sidebar: '#f0e3d9', brand: ['#ff7a59', '#ff9f43', '#ffd27d'], stroke: 'rgba(255, 255, 255, 0.58)' },
+    dark: { background: '#1a1010', foreground: '#fff2ea', sidebar: '#281713', brand: ['#ff9568', '#ffb36a', '#ffd27d'], stroke: 'rgba(243, 204, 186, 0.26)' },
+  },
+};
+
+const GLASS_LEVELS: Record<GlassLevel, any> = {
+  soft: {
+    light: { surface: 'rgba(255, 255, 255, 0.52)', surfaceStrong: 'rgba(255, 255, 255, 0.68)', shadow: '0 10px 26px rgba(20, 30, 55, 0.1)', glow: '0 1px 0 rgba(255, 255, 255, 0.72) inset, 0 18px 40px rgba(73, 122, 203, 0.08)' },
+    dark: { surface: 'rgba(12, 24, 46, 0.52)', surfaceStrong: 'rgba(14, 30, 56, 0.66)', shadow: '0 10px 26px rgba(2, 6, 18, 0.34)', glow: '0 1px 0 rgba(178, 203, 245, 0.16) inset, 0 18px 44px rgba(12, 46, 94, 0.18)' },
+  },
+  balanced: {
+    light: { surface: 'rgba(255, 255, 255, 0.64)', surfaceStrong: 'rgba(255, 255, 255, 0.8)', shadow: '0 14px 40px rgba(20, 30, 55, 0.14)', glow: '0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 24px 60px rgba(73, 122, 203, 0.16)' },
+    dark: { surface: 'rgba(12, 24, 46, 0.66)', surfaceStrong: 'rgba(14, 30, 56, 0.8)', shadow: '0 16px 46px rgba(2, 6, 18, 0.48)', glow: '0 1px 0 rgba(178, 203, 245, 0.22) inset, 0 24px 64px rgba(12, 46, 94, 0.32)' },
+  },
+  strong: {
+    light: { surface: 'rgba(255, 255, 255, 0.74)', surfaceStrong: 'rgba(255, 255, 255, 0.88)', shadow: '0 18px 48px rgba(20, 30, 55, 0.18)', glow: '0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 28px 72px rgba(73, 122, 203, 0.2)' },
+    dark: { surface: 'rgba(12, 24, 46, 0.76)', surfaceStrong: 'rgba(14, 30, 56, 0.88)', shadow: '0 18px 48px rgba(2, 6, 18, 0.58)', glow: '0 1px 0 rgba(178, 203, 245, 0.28) inset, 0 28px 72px rgba(12, 46, 94, 0.42)' },
+  },
+};
+
+function applyAppearanceFromSettings(settings: { darkMode?: boolean; designPreset?: DesignPreset; glassLevel?: GlassLevel }) {
+  if (typeof document === 'undefined') return;
+
+  const darkMode = !!settings.darkMode;
+  const preset = THEME_PRESETS[settings.designPreset || 'aurora'];
+  const glass = GLASS_LEVELS[settings.glassLevel || 'balanced'];
+  const mode = darkMode ? 'dark' : 'light';
+  const theme = preset[mode];
+  const glassTokens = glass[mode];
+
+  document.documentElement.style.setProperty('--background', theme.background);
+  document.documentElement.style.setProperty('--foreground', theme.foreground);
+  document.documentElement.style.setProperty('--sidebar-bg', theme.sidebar);
+  document.documentElement.style.setProperty('--brand-1', theme.brand[0]);
+  document.documentElement.style.setProperty('--brand-2', theme.brand[1]);
+  document.documentElement.style.setProperty('--brand-3', theme.brand[2]);
+  document.documentElement.style.setProperty('--border-color', theme.stroke);
+  document.documentElement.style.setProperty('--surface-glass', glassTokens.surface);
+  document.documentElement.style.setProperty('--surface-glass-strong', glassTokens.surfaceStrong);
+  document.documentElement.style.setProperty('--surface-stroke', theme.stroke);
+  document.documentElement.style.setProperty('--surface-shadow', glassTokens.shadow);
+  document.documentElement.style.setProperty('--surface-glow', glassTokens.glow);
+
+  if (darkMode) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}
 
 function MainApp() {
   const { t } = useTranslation();
@@ -54,6 +129,94 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
+    let disposed = false;
+    let isRunning = false;
+
+    const runGoogleSync = async () => {
+      if (disposed || isRunning) return;
+      const auth = readGoogleAuth();
+      if (!auth) {
+        return;
+      }
+      if (!isGoogleTokenValid(auth)) {
+        clearGoogleAuth();
+        window.dispatchEvent(new Event('googleAuthChanged'));
+        return;
+      }
+
+      try {
+        isRunning = true;
+        await syncGooglePrimaryCalendar(auth.accessToken);
+        window.dispatchEvent(new Event('calendarEventsUpdated'));
+        window.dispatchEvent(new Event('googleSyncMetaUpdated'));
+      } catch (error: any) {
+        if (error?.status === 401) {
+          clearGoogleAuth();
+          window.dispatchEvent(new Event('googleAuthChanged'));
+        }
+      } finally {
+        isRunning = false;
+      }
+    };
+
+    const autoSyncEnabled = () => {
+      const raw = localStorage.getItem(GOOGLE_AUTO_SYNC_KEY);
+      return raw === null ? true : raw === 'true';
+    };
+
+    void runGoogleSync();
+
+    let intervalId = window.setInterval(() => {
+      if (autoSyncEnabled()) {
+        void runGoogleSync();
+      }
+    }, 10 * 60 * 1000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && autoSyncEnabled()) {
+        void runGoogleSync();
+      }
+    };
+
+    const handleSyncNow = () => {
+      void runGoogleSync();
+    };
+
+    const handleAuthChange = () => {
+      void runGoogleSync();
+    };
+
+    const handleAutoSyncChanged = () => {
+      window.clearInterval(intervalId);
+      intervalId = window.setInterval(() => {
+        if (autoSyncEnabled()) {
+          void runGoogleSync();
+        }
+      }, 10 * 60 * 1000);
+
+      if (autoSyncEnabled()) {
+        void runGoogleSync();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibility);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('googleSyncNow', handleSyncNow);
+    window.addEventListener('googleAuthChanged', handleAuthChange);
+    window.addEventListener('calendarGoogleAutoSyncChanged', handleAutoSyncChanged);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleVisibility);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('googleSyncNow', handleSyncNow);
+      window.removeEventListener('googleAuthChanged', handleAuthChange);
+      window.removeEventListener('calendarGoogleAutoSyncChanged', handleAutoSyncChanged);
+    };
+  }, []);
+
+  useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'n') {
         event.preventDefault();
@@ -68,13 +231,14 @@ function MainApp() {
     // Load theme preference from settings
     const savedSettings = localStorage.getItem('settings');
     if (savedSettings) {
-      const settings = JSON.parse(savedSettings);
-      setDarkMode(settings.darkMode || false);
-      if (settings.darkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+      const parsed = JSON.parse(savedSettings);
+      const merged = {
+        darkMode: parsed.darkMode || false,
+        designPreset: parsed.designPreset || parsed.design?.preset || 'aurora',
+        glassLevel: parsed.glassLevel || parsed.design?.glassLevel || 'balanced',
+      };
+      setDarkMode(merged.darkMode);
+      applyAppearanceFromSettings(merged);
     } else {
       // Check old darkMode setting or system preference
       const oldDarkMode = localStorage.getItem('darkMode') === 'true';
@@ -82,12 +246,10 @@ function MainApp() {
       const isDark = oldDarkMode || systemDark;
       
       setDarkMode(isDark);
-      if (isDark) {
-        document.documentElement.classList.add('dark');
-      }
+      applyAppearanceFromSettings({ darkMode: isDark, designPreset: 'aurora', glassLevel: 'balanced' });
       
       // Migrate to new settings format
-      localStorage.setItem('settings', JSON.stringify({ darkMode: isDark, language: 'de' }));
+      localStorage.setItem('settings', JSON.stringify({ darkMode: isDark, language: 'de', designPreset: 'aurora', glassLevel: 'balanced' }));
       localStorage.removeItem('darkMode'); // Remove old setting
     }
     
@@ -96,11 +258,13 @@ function MainApp() {
       const newDarkMode = event.detail?.darkMode;
       if (newDarkMode !== undefined) {
         setDarkMode(newDarkMode);
-        if (newDarkMode) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
+        const savedSettings = localStorage.getItem('settings');
+        const parsed = savedSettings ? JSON.parse(savedSettings) : {};
+        applyAppearanceFromSettings({
+          darkMode: newDarkMode,
+          designPreset: parsed.designPreset || parsed.design?.preset || 'aurora',
+          glassLevel: parsed.glassLevel || parsed.design?.glassLevel || 'balanced',
+        });
       }
     };
     
@@ -117,16 +281,12 @@ function MainApp() {
     
     // Update settings in localStorage
     const savedSettings = localStorage.getItem('settings');
-    const settings = savedSettings ? JSON.parse(savedSettings) : { language: 'de' };
+    const settings = savedSettings ? JSON.parse(savedSettings) : { language: 'de', designPreset: 'aurora', glassLevel: 'balanced' };
     settings.darkMode = newMode;
     localStorage.setItem('settings', JSON.stringify(settings));
     
     // Apply to DOM
-    if (newMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    applyAppearanceFromSettings(settings);
     
     // Trigger event for other components (like SettingsView)
     window.dispatchEvent(new CustomEvent('darkModeChange', { detail: { darkMode: newMode } }));
@@ -214,6 +374,8 @@ function MainApp() {
         return <ProjectsView onNoteClick={handleNoteSelect} selectedProjectId={selectedProjectId} />;
       case 'tasks':
         return <TasksView />;
+      case 'calendar':
+        return <CalendarView />;
       case 'ideas':
         return <IdeasView />;
       case 'habits':
@@ -245,7 +407,7 @@ function MainApp() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden app-shell p-2 sm:p-3 gap-2 sm:gap-3">
+    <div className="flex h-screen overflow-hidden app-shell p-2.5 sm:p-3.5 gap-2.5 sm:gap-3.5">
       {/* Mobile Overlay - closes sidebar when clicked */}
       {sidebarOpen && (
         <div 
@@ -258,19 +420,19 @@ function MainApp() {
       <div
         className={`${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 ${sidebarCompact ? 'w-16' : 'w-64'} transition-all duration-300 overflow-hidden flex flex-col glass-panel-strong rounded-2xl`}
+        } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 ${sidebarCompact ? 'w-16' : 'w-64'} transition-all duration-300 overflow-hidden flex flex-col ui-surface-strong rounded-2xl`}
       >
         {/* Logo */}
-        <div className="h-14 flex items-center justify-between px-3 border-b border-white/50 dark:border-slate-600/40">
+        <div className="h-14 flex items-center justify-between px-3 border-b border-white/45 dark:border-slate-700/45">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 rounded-xl brand-pill flex items-center justify-center text-white font-bold text-sm">
               S
             </div>
-            {!sidebarCompact && <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">Synora Space</span>}
+            {!sidebarCompact && <span className="text-sm font-semibold tracking-tight text-slate-800 dark:text-slate-100 truncate">Synora Space</span>}
           </div>
           <button
             onClick={() => setSidebarCompact(!sidebarCompact)}
-            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg hover:bg-white/70 dark:hover:bg-slate-800/60"
+            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg ui-button-ghost border-transparent"
             title={sidebarCompact ? 'Sidebar erweitern' : 'Sidebar einklappen'}
           >
             <Menu size={14} />
@@ -285,11 +447,11 @@ function MainApp() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
-        <header className="h-14 flex items-center justify-between px-1 sm:px-2 mb-1 sm:mb-2">
+        <header className="h-14 flex items-center justify-between px-1 sm:px-2.5 mb-2">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 rounded-xl soft-hover hover:bg-white/70 dark:hover:bg-slate-800/60"
+              className="lg:hidden p-2 rounded-xl ui-button-ghost border-transparent"
             >
               <Menu size={20} />
             </button>
@@ -298,7 +460,7 @@ function MainApp() {
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={() => setNewNoteDialogOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl soft-hover bg-white/60 dark:bg-slate-800/55 hover:bg-white/80 dark:hover:bg-slate-800/75"
+              className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl ui-button-primary"
               title="Neue Notiz (Ctrl+Shift+N)"
             >
               <Plus size={16} />
@@ -306,14 +468,14 @@ function MainApp() {
             </button>
             <button
               onClick={() => setSearchOpen(true)}
-              className="p-2 rounded-xl soft-hover hover:bg-white/70 dark:hover:bg-slate-800/60"
+              className="p-2 rounded-xl ui-button-ghost border-transparent"
               title="Search (Ctrl+K)"
             >
               <Search size={18} className="sm:w-5 sm:h-5" />
             </button>
             <button
               onClick={toggleDarkMode}
-              className="p-2 rounded-xl soft-hover hover:bg-white/70 dark:hover:bg-slate-800/60"
+              className="p-2 rounded-xl ui-button-ghost border-transparent"
               title="Toggle Dark Mode"
             >
               {darkMode ? <Sun size={18} className="sm:w-5 sm:h-5" /> : <Moon size={18} className="sm:w-5 sm:h-5" />}
@@ -322,15 +484,19 @@ function MainApp() {
             {/* User Avatar Dropdown */}
             <div className="relative group">
               <button
-                className="w-8 h-8 rounded-full brand-pill flex items-center justify-center text-white text-sm font-semibold soft-hover"
+                className="w-8 h-8 rounded-full brand-pill flex items-center justify-center text-white text-sm font-semibold soft-hover overflow-hidden"
                 title={user?.username}
               >
-                {user?.username?.charAt(0).toUpperCase() || 'U'}
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+                ) : (
+                  user?.username?.charAt(0).toUpperCase() || 'U'
+                )}
               </button>
               
               {/* Dropdown Menu */}
-              <div className="absolute right-0 mt-2 w-48 glass-panel rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div className="p-3 border-b border-white/50 dark:border-slate-600/40">
+              <div className="absolute right-0 mt-2 w-52 ui-surface rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="p-3 border-b border-white/45 dark:border-slate-700/45">
                   <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
                     {user?.username}
                   </p>
@@ -341,7 +507,7 @@ function MainApp() {
                 <div className="py-1">
                   <button
                     onClick={() => setView('settings')}
-                    className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-white/70 dark:hover:bg-slate-800/60 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-white/65 dark:hover:bg-slate-800/50 transition-colors"
                   >
                     <span className="inline-flex items-center gap-2">
                       <Settings size={14} />
@@ -364,7 +530,7 @@ function MainApp() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden glass-panel rounded-2xl">
+        <div className="flex-1 overflow-hidden ui-surface-strong rounded-2xl">
           {renderContent()}
         </div>
       </div>

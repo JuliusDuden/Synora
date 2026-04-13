@@ -17,6 +17,7 @@ export interface Translations {
     graph: string;
     projects: string;
     tasks: string;
+    calendar: string;
     ideas: string;
     habits: string;
     settings: string;
@@ -242,6 +243,7 @@ export const translations: Record<Language, Translations> = {
       graph: 'Graph',
       projects: 'Projekte',
       tasks: 'Aufgaben',
+      calendar: 'Kalender',
       ideas: 'Ideen',
       habits: 'Gewohnheiten',
       settings: 'Einstellungen',
@@ -457,6 +459,7 @@ export const translations: Record<Language, Translations> = {
       graph: 'Graph',
       projects: 'Projects',
       tasks: 'Tasks',
+      calendar: 'Calendar',
       ideas: 'Ideas',
       habits: 'Habits',
       settings: 'Settings',
@@ -668,6 +671,7 @@ export const translations: Record<Language, Translations> = {
 
     nav: {
       dashboard: 'Tableau de bord',
+      calendar: 'Calendrier',
       notes: 'Notes',
       graph: 'Graphique',
       projects: 'Projets',
@@ -883,6 +887,7 @@ export const translations: Record<Language, Translations> = {
 
     nav: {
       dashboard: 'Panel',
+      calendar: 'Calendario',
       notes: 'Notas',
       graph: 'Gráfico',
       projects: 'Proyectos',

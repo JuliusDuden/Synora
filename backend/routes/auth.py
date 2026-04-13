@@ -8,6 +8,7 @@ from typing import Optional
 import sqlite3
 from datetime import datetime
 import uuid
+from pydantic import BaseModel
 
 from models.user import (
     UserCreate, UserLogin, User, UserInDB, Token, 
@@ -26,6 +27,11 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 security = HTTPBearer()
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "notes.db")
+
+
+class ProfileUpdate(BaseModel):
+    username: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 def get_db():
@@ -54,6 +60,7 @@ def init_auth_db():
             hashed_password TEXT NOT NULL,
             is_active INTEGER DEFAULT 1,
             is_2fa_enabled INTEGER DEFAULT 0,
+            avatar_url TEXT,
             totp_secret TEXT,
             encryption_salt TEXT,
             failed_login_attempts INTEGER DEFAULT 0,
@@ -61,7 +68,7 @@ def init_auth_db():
             created_at TEXT NOT NULL
         )
     """)
-    
+
     # Backup codes table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS backup_codes (
@@ -73,7 +80,7 @@ def init_auth_db():
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     """)
-    
+
     # Sessions table (optional, for session management)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
@@ -85,13 +92,28 @@ def init_auth_db():
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     """)
-    
+
     conn.commit()
     conn.close()
 
 
+def ensure_auth_columns():
+    """Apply lightweight migrations for older databases."""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA table_info(users)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    if 'avatar_url' not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
+
+    conn.commit()
+    conn.close()
+
 # Initialize DB on import
 init_auth_db()
+ensure_auth_columns()
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
@@ -125,6 +147,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         created_at=datetime.fromisoformat(row["created_at"]),
         is_active=bool(row["is_active"]),
         is_2fa_enabled=bool(row["is_2fa_enabled"]),
+        avatar_url=row["avatar_url"] if "avatar_url" in row.keys() else None,
         encryption_salt=row["encryption_salt"] if "encryption_salt" in row.keys() else None,
         failed_login_attempts=row["failed_login_attempts"]
     )
@@ -177,6 +200,7 @@ async def register(user_data: UserCreate):
         created_at=datetime.fromisoformat(created_at),
         is_active=True,
         is_2fa_enabled=False,
+        avatar_url=None,
         encryption_salt=encryption_salt,
         failed_login_attempts=0
     )
@@ -278,6 +302,7 @@ async def login(credentials: UserLogin):
         created_at=datetime.fromisoformat(row["created_at"]),
         is_active=bool(row["is_active"]),
         is_2fa_enabled=bool(row["is_2fa_enabled"]),
+        avatar_url=row["avatar_url"] if "avatar_url" in row.keys() else None,
         failed_login_attempts=0
     )
     
@@ -288,6 +313,58 @@ async def login(credentials: UserLogin):
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user profile"""
     return current_user
+
+
+@router.put("/profile", response_model=User)
+async def update_profile(profile: ProfileUpdate, current_user: User = Depends(get_current_user)):
+    """Update username and/or avatar_url for the current user"""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    updates = []
+    values = []
+
+    if profile.username is not None:
+        username = profile.username.strip()
+        if not username:
+            conn.close()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username cannot be empty")
+
+        cursor.execute("SELECT id FROM users WHERE username = ? AND id != ?", (username, current_user.id))
+        if cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+
+        updates.append("username = ?")
+        values.append(username)
+
+    if profile.avatar_url is not None:
+        updates.append("avatar_url = ?")
+        values.append(profile.avatar_url)
+
+    if not updates:
+        conn.close()
+        return current_user
+
+    values.append(current_user.id)
+    cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", values)
+    conn.commit()
+
+    cursor.execute("SELECT * FROM users WHERE id = ?", (current_user.id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    return User(
+        id=row["id"],
+        email=row["email"],
+        username=row["username"],
+        created_at=datetime.fromisoformat(row["created_at"]),
+        is_active=bool(row["is_active"]),
+        is_2fa_enabled=bool(row["is_2fa_enabled"]),
+        avatar_url=row["avatar_url"] if "avatar_url" in row.keys() else None,
+        encryption_salt=row["encryption_salt"] if "encryption_salt" in row.keys() else None,
+        failed_login_attempts=row["failed_login_attempts"]
+    )
 
 
 @router.post("/2fa/setup", response_model=TwoFactorSetup)

@@ -3,41 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --background: #eef2f8;
+  --background: #eef1f6;
   --foreground: #111827;
-  --sidebar-bg: #e9eef6;
-  --border-color: rgba(150, 164, 186, 0.24);
+  --sidebar-bg: #e7ebf2;
+  --border-color: rgba(124, 139, 161, 0.24);
   --surface-glass: rgba(255, 255, 255, 0.64);
   --surface-glass-strong: rgba(255, 255, 255, 0.8);
-  --surface-stroke: rgba(255, 255, 255, 0.62);
-  --surface-shadow: 0 14px 40px rgba(20, 30, 55, 0.14);
-  --surface-glow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 24px 60px rgba(73, 122, 203, 0.16);
-  --brand-1: #1f7cff;
-  --brand-2: #36c1ff;
-  --brand-3: #9be8ff;
+  --surface-stroke: rgba(255, 255, 255, 0.64);
+  --surface-shadow: 0 12px 34px rgba(15, 23, 42, 0.12);
+  --surface-glow: 0 1px 0 rgba(255, 255, 255, 0.82) inset, 0 20px 52px rgba(61, 94, 148, 0.14);
+  --brand-1: #0f4f9f;
+  --brand-2: #2f6fbf;
+  --brand-3: #8fb3e3;
 }
 
 .dark {
-  --background: #0a1323;
-  --foreground: #e7eefc;
-  --sidebar-bg: #0d1b33;
-  --border-color: rgba(180, 200, 230, 0.22);
-  --surface-glass: rgba(12, 24, 46, 0.66);
-  --surface-glass-strong: rgba(14, 30, 56, 0.8);
-  --surface-stroke: rgba(192, 210, 240, 0.28);
-  --surface-shadow: 0 16px 46px rgba(2, 6, 18, 0.48);
-  --surface-glow: 0 1px 0 rgba(178, 203, 245, 0.22) inset, 0 24px 64px rgba(12, 46, 94, 0.32);
-  --brand-1: #71a7ff;
-  --brand-2: #69ddff;
-  --brand-3: #86f4c3;
+  --background: #0d1420;
+  --foreground: #e6edf8;
+  --sidebar-bg: #111b2b;
+  --border-color: rgba(166, 182, 206, 0.24);
+  --surface-glass: rgba(17, 27, 43, 0.66);
+  --surface-glass-strong: rgba(21, 33, 52, 0.82);
+  --surface-stroke: rgba(172, 188, 211, 0.28);
+  --surface-shadow: 0 16px 44px rgba(2, 6, 16, 0.5);
+  --surface-glow: 0 1px 0 rgba(162, 182, 212, 0.2) inset, 0 22px 60px rgba(14, 26, 45, 0.42);
+  --brand-1: #8eb4e5;
+  --brand-2: #76a1d9;
+  --brand-3: #aac3e7;
 }
 
 body {
   position: relative;
   color: var(--foreground);
-  background: radial-gradient(1200px 700px at -10% -20%, rgba(130, 190, 255, 0.32), transparent 62%),
-    radial-gradient(1100px 760px at 120% 120%, rgba(95, 226, 245, 0.28), transparent 58%),
-    linear-gradient(180deg, #f7f9fc 0%, var(--background) 64%, #ecf0f6 100%);
+  background: radial-gradient(1000px 620px at -8% -22%, rgba(156, 178, 214, 0.26), transparent 62%),
+    radial-gradient(980px 700px at 118% 116%, rgba(173, 197, 231, 0.2), transparent 58%),
+    linear-gradient(180deg, #f8f9fb 0%, var(--background) 66%, #edf0f5 100%);
   font-family: var(--font-ui), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -55,9 +55,9 @@ body::before {
 }
 
 .dark body {
-  background: radial-gradient(1300px 760px at -10% -20%, rgba(95, 130, 255, 0.28), transparent 58%),
-    radial-gradient(1100px 760px at 120% 115%, rgba(74, 220, 255, 0.2), transparent 55%),
-    linear-gradient(180deg, #0d172b 0%, var(--background) 58%, #08101c 100%);
+  background: radial-gradient(1180px 720px at -8% -20%, rgba(88, 117, 165, 0.24), transparent 58%),
+    radial-gradient(1040px 760px at 118% 114%, rgba(66, 92, 138, 0.2), transparent 55%),
+    linear-gradient(180deg, #101a2a 0%, var(--background) 58%, #0b121d 100%);
 }
 
 .dark body::before {
@@ -66,7 +66,11 @@ body::before {
 }
 
 .glass-panel {
-  background: var(--surface-glass);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.18)),
+    radial-gradient(circle at top left, rgba(31, 124, 255, 0.14), transparent 45%),
+    radial-gradient(circle at bottom right, rgba(54, 193, 255, 0.1), transparent 42%),
+    var(--surface-glass);
   border: 1px solid var(--surface-stroke);
   box-shadow: var(--surface-shadow), var(--surface-glow);
   backdrop-filter: blur(20px) saturate(165%);
@@ -74,7 +78,11 @@ body::before {
 }
 
 .glass-panel-strong {
-  background: var(--surface-glass-strong);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.24)),
+    radial-gradient(circle at top left, rgba(31, 124, 255, 0.18), transparent 44%),
+    radial-gradient(circle at bottom right, rgba(54, 193, 255, 0.14), transparent 40%),
+    var(--surface-glass-strong);
   border: 1px solid var(--surface-stroke);
   box-shadow: var(--surface-shadow), var(--surface-glow);
   backdrop-filter: blur(22px) saturate(175%);
@@ -86,8 +94,8 @@ body::before {
 }
 
 .brand-pill {
-  background: linear-gradient(135deg, var(--brand-1), var(--brand-2) 55%, var(--brand-3));
-  box-shadow: 0 8px 20px rgba(31, 124, 255, 0.34);
+  background: linear-gradient(145deg, var(--brand-1), var(--brand-2) 60%, var(--brand-3));
+  box-shadow: 0 8px 20px rgba(16, 39, 73, 0.34);
 }
 
 .brand-gradient-text {
@@ -103,6 +111,60 @@ body::before {
 
 .soft-hover:hover {
   transform: translateY(-1px);
+}
+
+.ui-surface {
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--surface-glass) 92%, white 8%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
+  backdrop-filter: blur(16px) saturate(155%);
+  -webkit-backdrop-filter: blur(16px) saturate(155%);
+}
+
+.ui-surface-strong {
+  border: 1px solid var(--surface-stroke);
+  background: color-mix(in srgb, var(--surface-glass-strong) 92%, white 8%);
+  box-shadow: var(--surface-shadow), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
+}
+
+.ui-button-primary {
+  border: 1px solid color-mix(in srgb, var(--brand-1) 72%, #0b1320 28%);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--brand-1) 88%, #0b1320 12%), color-mix(in srgb, var(--brand-2) 86%, #0b1320 14%));
+  color: #f8fbff;
+  box-shadow: 0 10px 24px rgba(15, 30, 54, 0.24);
+  transition: filter 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.ui-button-primary:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(15, 30, 54, 0.28);
+}
+
+.ui-button-ghost {
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--surface-glass) 88%, transparent 12%);
+  color: color-mix(in srgb, var(--foreground) 86%, #6b7280 14%);
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.ui-button-ghost:hover {
+  background: color-mix(in srgb, var(--surface-glass-strong) 88%, white 12%);
+  border-color: color-mix(in srgb, var(--border-color) 78%, var(--brand-2) 22%);
+}
+
+.ui-input {
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--surface-glass-strong) 84%, white 16%);
+  color: var(--foreground);
+}
+
+.ui-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--brand-2) 58%, var(--border-color) 42%);
+  box-shadow: 0 0 0 3px rgba(47, 111, 191, 0.18);
 }
 
 @layer utilities {
@@ -217,11 +279,6 @@ body::before {
 
 .graph-node {
   animation: float 6s ease-in-out infinite;
-}
-
-/* Smooth transitions */
-* {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Monaco Editor - Hide base64 image data line */

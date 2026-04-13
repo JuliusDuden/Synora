@@ -77,28 +77,28 @@ export default function Dashboard({ onNavigate, onCreateNote }: DashboardProps) 
       value: stats.totalNotes,
       subtitle: t.dashboard.stats.documents,
       icon: FileText,
-      color: 'from-slate-500 to-slate-600',
+      color: 'bg-slate-700 dark:bg-slate-500',
     },
     {
       title: t.dashboard.stats.projects,
       value: stats.totalProjects,
       subtitle: t.dashboard.stats.activeProjects,
       icon: FolderKanban,
-      color: 'from-blue-500 to-blue-600',
+      color: 'bg-blue-700 dark:bg-blue-500',
     },
     {
       title: t.dashboard.stats.tasks,
       value: `${stats.completedTasks}/${stats.totalTasks}`,
       subtitle: t.dashboard.stats.completed,
       icon: CheckSquare,
-      color: 'from-green-500 to-green-600',
+      color: 'bg-emerald-700 dark:bg-emerald-500',
     },
     {
       title: t.dashboard.stats.ideas,
       value: stats.totalIdeas,
       subtitle: t.dashboard.stats.collected,
       icon: Lightbulb,
-      color: 'from-amber-500 to-amber-600',
+      color: 'bg-amber-700 dark:bg-amber-500',
     },
   ];
 
@@ -107,7 +107,7 @@ export default function Dashboard({ onNavigate, onCreateNote }: DashboardProps) 
     : 0;
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
+    <div className="h-full overflow-y-auto bg-transparent">
       <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="space-y-1">
@@ -125,7 +125,7 @@ export default function Dashboard({ onNavigate, onCreateNote }: DashboardProps) 
         </div>
 
         {/* Quick Actions */}
-        <div className="glass-panel rounded-2xl p-4 sm:p-5">
+        <div className="ui-surface rounded-2xl p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">
               Schnellzugriff
@@ -133,19 +133,19 @@ export default function Dashboard({ onNavigate, onCreateNote }: DashboardProps) 
             <span className="text-xs text-slate-500 dark:text-slate-400">Fokus auf die wichtigsten Aktionen</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            <button onClick={() => onCreateNote?.()} className="soft-hover glass-panel rounded-xl p-3 text-left">
+            <button onClick={() => onCreateNote?.()} className="soft-hover ui-surface rounded-xl p-3 text-left">
               <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Neue Notiz</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Direkt Gedanken erfassen</p>
             </button>
-            <button onClick={() => onNavigate?.('tasks')} className="soft-hover glass-panel rounded-xl p-3 text-left">
+            <button onClick={() => onNavigate?.('tasks')} className="soft-hover ui-surface rounded-xl p-3 text-left">
               <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Aufgaben öffnen</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Todo, In Progress, Done</p>
             </button>
-            <button onClick={() => onNavigate?.('projects')} className="soft-hover glass-panel rounded-xl p-3 text-left">
+            <button onClick={() => onNavigate?.('projects')} className="soft-hover ui-surface rounded-xl p-3 text-left">
               <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Projekte verwalten</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Planung und Priorisierung</p>
             </button>
-            <button onClick={() => onNavigate?.('connects')} className="soft-hover glass-panel rounded-xl p-3 text-left">
+            <button onClick={() => onNavigate?.('connects')} className="soft-hover ui-surface rounded-xl p-3 text-left">
               <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Connects & Sharing</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Zusammenarbeit im Blick</p>
             </button>
@@ -159,10 +159,10 @@ export default function Dashboard({ onNavigate, onCreateNote }: DashboardProps) 
             return (
               <div
                 key={stat.title}
-                className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                className="ui-surface rounded-lg p-4 sm:p-6 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
               >
                 <div className="flex items-start justify-between mb-3 sm:mb-4">
-                  <div className={`p-2 sm:p-2.5 rounded-lg bg-gradient-to-br ${stat.color}`}>
+                  <div className={`p-2 sm:p-2.5 rounded-lg ${stat.color}`}>
                     <Icon size={18} className="sm:w-5 sm:h-5 text-white" />
                   </div>
                 </div>
@@ -183,7 +183,7 @@ export default function Dashboard({ onNavigate, onCreateNote }: DashboardProps) 
         {/* Progress Overview */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
           {/* Tasks Progress */}
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
+          <div className="ui-surface rounded-lg p-4 sm:p-6">
             <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
               {t.tasks.overview}
             </h2>
@@ -224,7 +224,7 @@ export default function Dashboard({ onNavigate, onCreateNote }: DashboardProps) 
           </div>
 
           {/* Activity Summary */}
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
+          <div className="ui-surface rounded-lg p-4 sm:p-6">
             <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
               {t.common.activities}
             </h2>

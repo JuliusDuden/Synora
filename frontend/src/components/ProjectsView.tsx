@@ -158,7 +158,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
+    <div className="h-full overflow-y-auto bg-transparent">
       <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
@@ -172,7 +172,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
           </div>
           <button 
             onClick={() => setIsCreating(true)}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-xs sm:text-sm font-medium transition-colors w-full sm:w-auto justify-center"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors w-full sm:w-auto justify-center ui-button-primary"
           >
             <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
             {t.projects.newProject}
@@ -181,7 +181,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
 
         {/* Create Form */}
         {isCreating && (
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-800">
+          <div className="ui-surface rounded-lg p-4 sm:p-6">
             <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
               {t.projects.newProject}
             </h3>
@@ -194,7 +194,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
                   type="text"
                   value={newProject.name}
                   onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
+                  className="w-full px-3 py-2 text-sm rounded-lg ui-input"
                   placeholder={t.projects.projectName + '...'}
                   autoFocus
                 />
@@ -206,7 +206,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
                 <textarea
                   value={newProject.description}
                   onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white resize-none"
+                  className="w-full px-3 py-2 text-sm rounded-lg ui-input resize-none"
                   rows={3}
                   placeholder={t.projects.projectDescription + '...'}
                 />
@@ -214,7 +214,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
               <div className="flex gap-2">
                 <button
                   onClick={createProject}
-                  className="px-4 py-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-sm font-medium transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium ui-button-primary"
                 >
                   {t.projects.create}
                 </button>
@@ -223,7 +223,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
                     setIsCreating(false);
                     setNewProject({ name: '', description: '' });
                   }}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium ui-button-ghost"
                 >
                   {t.projects.cancel}
                 </button>
@@ -240,16 +240,16 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
               <div
                 key={project.id}
                 onClick={() => setSelectedProjectId(project.id)}
-                className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600 cursor-pointer transition-colors"
+                className="ui-surface rounded-lg p-5 hover:border-gray-400 dark:hover:border-gray-600 cursor-pointer transition-colors"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                    <div className="p-2 rounded-lg ui-surface">
                     <Folder size={20} className="text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="flex items-center gap-1">
                     <button 
                       onClick={(e) => openShareDialog(project, e)}
-                      className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                      className="p-1.5 hover:bg-white/70 dark:hover:bg-slate-800/55 rounded transition-colors"
                       title="Projekt teilen"
                     >
                       <Share2 size={16} className="text-gray-400 hover:text-indigo-500" />
@@ -259,7 +259,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
                         e.stopPropagation();
                         deleteProject(project.id);
                       }}
-                      className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                      className="p-1.5 hover:bg-white/70 dark:hover:bg-slate-800/55 rounded transition-colors"
                     >
                       <Trash2 size={16} className="text-gray-400 hover:text-red-500" />
                     </button>
@@ -314,13 +314,13 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
                 <div
                   key={project.id}
                   onClick={() => setSelectedProjectId(project.id)}
-                  className="bg-white dark:bg-gray-900 rounded-lg p-5 border-2 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600 cursor-pointer transition-colors"
+                  className="ui-surface rounded-lg p-5 border-2 border-slate-300/70 dark:border-slate-600/60 hover:border-slate-400 dark:hover:border-slate-500 cursor-pointer transition-colors"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-                      <Folder size={20} className="text-indigo-500" />
+                    <div className="p-2 rounded-lg ui-surface">
+                      <Folder size={20} className="text-slate-600 dark:text-slate-300" />
                     </div>
-                      <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
+                      <span className="text-xs text-slate-600 dark:text-slate-300 bg-slate-100/70 dark:bg-slate-800/55 px-2 py-1 rounded">
                         von {project.shared_by || 'unbekannt'}
                     </span>
                   </div>
@@ -351,7 +351,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
             </p>
             <button
               onClick={() => setIsCreating(true)}
-              className="px-4 py-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium ui-button-primary"
             >
               {t.projects.create}
             </button>

@@ -104,6 +104,15 @@ export interface Habit {
   modified_at: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  avatar_url?: string | null;
+  is_2fa_enabled: boolean;
+  encryption_salt?: string;
+}
+
 class API {
   // Simple fetch wrapper with retries for transient errors (503, network failures)
   private async requestWithRetries(input: string, init?: RequestInit, retries: number = 3, backoffMs: number = 250): Promise<Response> {
@@ -141,7 +150,11 @@ class API {
     const res = await fetch(`${API_URL}/api/notes/${encodeURIComponent(name)}`, {
       headers: getAuthHeaders()
     });
-    if (!res.ok) throw new Error('Failed to fetch note');
+    if (!res.ok) {
+      const error = new Error(res.status === 404 ? 'Note not found' : 'Failed to fetch note') as Error & { status?: number };
+      error.status = res.status;
+      throw error;
+    }
     return res.json();
   }
 
@@ -218,6 +231,30 @@ class API {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error('Failed to create daily note');
+    return res.json();
+  }
+
+  async getMe(): Promise<AuthUser> {
+    const res = await fetch(`${API_URL}/api/auth/me`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to load user profile');
+    return res.json();
+  }
+
+  async updateProfile(data: { username?: string; avatar_url?: string | null }): Promise<AuthUser> {
+    const res = await fetch(`${API_URL}/api/auth/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Failed to update profile');
+    }
     return res.json();
   }
 
