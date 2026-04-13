@@ -76,6 +76,30 @@ const turndownService = new TurndownService({
 // Use GFM plugin for tables, strikethrough, and task lists
 turndownService.use(gfm);
 
+turndownService.addRule('strikethrough', {
+  filter: function (node) {
+    const tag = node.nodeName.toLowerCase();
+    return tag === 'del' || tag === 's' || tag === 'strike';
+  },
+  replacement: function (content) {
+    return `~~${content}~~`;
+  },
+});
+
+// Preserve task list markdown syntax from Tiptap task nodes.
+turndownService.addRule('tiptapTaskItem', {
+  filter: function (node) {
+    return node.nodeName === 'LI' && (node as HTMLElement).getAttribute('data-type') === 'taskItem';
+  },
+  replacement: function (_content, node) {
+    const element = node as HTMLElement;
+    const checked = element.getAttribute('data-checked') === 'true';
+    const textContainer = element.querySelector('div');
+    const text = (textContainer?.textContent || element.textContent || '').replace(/\s+/g, ' ').trim();
+    return `\n- [${checked ? 'x' : ' '}] ${text}`;
+  },
+});
+
 // Custom rule for images to keep the attachment URLs
 turndownService.addRule('image', {
   filter: 'img',
@@ -201,6 +225,68 @@ export default function RichTextEditor({
   const isInitialized = useRef(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
 
+  const normalizeTaskListHtml = (html: string) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const listItems = Array.from(doc.querySelectorAll('li'));
+
+    listItems.forEach((li) => {
+      let checked: boolean | null = null;
+      const checkbox = li.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+
+      if (checkbox) {
+        checked = checkbox.checked || checkbox.hasAttribute('checked');
+      } else {
+        const text = (li.textContent || '').trim();
+        const match = text.match(/^\[( |x|X)\]\s+/);
+        if (match) {
+          checked = match[1].toLowerCase() === 'x';
+        }
+      }
+
+      if (checked === null) {
+        return;
+      }
+
+      const parent = li.parentElement;
+      if (parent && parent.tagName === 'UL') {
+        parent.setAttribute('data-type', 'taskList');
+      }
+
+      const originalHtml = li.innerHTML;
+      const textHtml = checkbox
+        ? originalHtml.replace(/<input[^>]*type=["']checkbox["'][^>]*>\s*/i, '').trim()
+        : originalHtml.replace(/^\s*\[(?: |x|X)\]\s*/i, '').trim();
+
+      li.setAttribute('data-type', 'taskItem');
+      li.setAttribute('data-checked', checked ? 'true' : 'false');
+      li.innerHTML = '';
+
+      const label = doc.createElement('label');
+      label.setAttribute('contenteditable', 'false');
+      const input = doc.createElement('input');
+      input.setAttribute('type', 'checkbox');
+      if (checked) {
+        input.setAttribute('checked', 'checked');
+      }
+      const span = doc.createElement('span');
+      label.appendChild(input);
+      label.appendChild(span);
+
+      const wrapper = doc.createElement('div');
+      if (textHtml) {
+        wrapper.innerHTML = /^<p[\s>]/i.test(textHtml) ? textHtml : `<p>${textHtml}</p>`;
+      } else {
+        wrapper.innerHTML = '<p></p>';
+      }
+
+      li.appendChild(label);
+      li.appendChild(wrapper);
+    });
+
+    return doc.body.innerHTML;
+  };
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -245,6 +331,47 @@ export default function RichTextEditor({
         name: 'uploadBase64Images',
         addProseMirrorPlugins() {
           return [uploadBase64ImagesPlugin()];
+        },
+      }),
+      Extension.create({
+        name: 'taskMarkdownShortcut',
+        addKeyboardShortcuts() {
+          return {
+            Space: () => {
+              const { state } = this.editor;
+              const { $from } = state.selection;
+
+              if (!this.editor.isActive('bulletList')) {
+                return false;
+              }
+
+              const text = $from.parent.textContent.trim();
+              const match = text.match(/^\[( |x|X)\]$/);
+              if (!match) {
+                return false;
+              }
+
+              const shouldCheck = match[1].toLowerCase() === 'x';
+              const from = $from.start();
+              const to = $from.end();
+
+              this.editor
+                .chain()
+                .focus()
+                .command(({ tr }) => {
+                  tr.delete(from, to);
+                  return true;
+                })
+                .toggleTaskList()
+                .run();
+
+              if (shouldCheck) {
+                this.editor.chain().focus().updateAttributes('taskItem', { checked: true }).run();
+              }
+
+              return true;
+            },
+          };
         },
       }),
     ],
@@ -337,11 +464,11 @@ export default function RichTextEditor({
     // Initial load or external update
     if (!isInitialized.current || (content !== lastMarkdown.current && !isLocalUpdate.current)) {
       try {
-        const html = marked.parse(content, { 
+        const html = marked.parse(content, {
           gfm: true, 
           breaks: true 
         }) as string;
-        editor.commands.setContent(html, { emitUpdate: false });
+        editor.commands.setContent(normalizeTaskListHtml(html), { emitUpdate: false });
         lastMarkdown.current = content;
         isInitialized.current = true;
       } catch (error) {

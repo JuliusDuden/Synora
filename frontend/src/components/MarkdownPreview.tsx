@@ -18,6 +18,11 @@ md.use(markdownItTaskLists, {
   labelAfter: true,
 });
 
+const normalizeLegacyStrikethrough = (text: string) => {
+  // Backward compatibility for notes saved as ~text~ instead of ~~text~~.
+  return text.replace(/(^|[^~`])~([^~\n]+)~(?=[^~`]|$)/g, '$1~~$2~~');
+};
+
 interface MarkdownPreviewProps {
   content: string;
   onLinkClick?: (link: string) => void;
@@ -47,7 +52,7 @@ export default function MarkdownPreview({ content, onLinkClick, onTaskToggle }: 
     );
 
     // Render markdown
-    const html = md.render(processedContent);
+    const html = md.render(normalizeLegacyStrikethrough(processedContent));
     containerRef.current.innerHTML = html;
 
     // Handle wiki link clicks
@@ -102,6 +107,19 @@ export default function MarkdownPreview({ content, onLinkClick, onTaskToggle }: 
         .markdown-preview li {
           margin-top: 0.5em;
           margin-bottom: 0.5em;
+        }
+        .markdown-preview del,
+        .markdown-preview s {
+          text-decoration-line: line-through;
+          text-decoration-thickness: 2px;
+          text-decoration-color: rgba(99, 102, 241, 0.7);
+          text-underline-offset: 0.14em;
+          opacity: 0.88;
+        }
+        .dark .markdown-preview del,
+        .dark .markdown-preview s {
+          text-decoration-color: rgba(129, 140, 248, 0.82);
+          opacity: 0.92;
         }
         .markdown-preview ul.contains-task-list {
           list-style: none;

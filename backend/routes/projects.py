@@ -55,6 +55,12 @@ class Project(BaseModel):
     modified_at: str
 
 
+class SharedProject(Project):
+    shared_by: Optional[str] = None
+    permission: Optional[str] = None
+    is_shared: bool = True
+
+
 @router.get("", response_model=List[Project])
 async def list_projects(current_user: User = Depends(get_current_user)):
     """List all projects for current user"""
@@ -214,7 +220,7 @@ async def delete_project(
     return {"success": True}
 
 
-@router.get("/shared", response_model=List[Project])
+@router.get("/shared", response_model=List[SharedProject])
 async def list_shared_projects(current_user: User = Depends(get_current_user)):
     """List all projects shared with the current user"""
     conn = get_db()

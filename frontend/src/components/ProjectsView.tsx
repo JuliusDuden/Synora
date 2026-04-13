@@ -64,6 +64,8 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
     }
   };
 
+  const allProjects = [...projects, ...sharedProjects];
+
   const openShareDialog = (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
     setShareProject(project);
@@ -136,7 +138,7 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
     );
   }
 
-  const selectedProject = selectedProjectId ? projects.find(p => p.id === selectedProjectId) : null;
+  const selectedProject = selectedProjectId ? allProjects.find(p => p.id === selectedProjectId) : null;
 
   const statusLabels = {
     active: t.projects.statusActive,
@@ -318,8 +320,8 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
                     <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
                       <Folder size={20} className="text-indigo-500" />
                     </div>
-                    <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
-                      von {project.shared_by}
+                      <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
+                        von {project.shared_by || 'unbekannt'}
                     </span>
                   </div>
 
@@ -409,12 +411,14 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
     
     // Load notes from backend that are tagged with this project
     try {
-      // Use api module with proper authentication
-      const allNotes = await api.getAllNotes();
+      const [allNotes, sharedNotes] = await Promise.all([
+        api.getAllNotes(),
+        project.is_shared ? api.getSharedNotes().catch(() => []) : Promise.resolve([]),
+      ]);
       
       // Filter notes that have this project assigned
       // Note: NoteList has project directly, not in metadata
-      const projectNotes = allNotes.filter((note: any) => {
+      const projectNotes = [...allNotes, ...sharedNotes].filter((note: any) => {
         // Convert both to strings for comparison
         const noteProject = String(note.project || '');
         const searchProject = String(project.id);
@@ -429,8 +433,11 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
     
     // Load tasks from backend that belong to this project
     try {
-      const allTasks = await api.getTasks();
-      const projectTasks = allTasks.filter((task: any) => 
+      const [allTasks, sharedTasks] = await Promise.all([
+        api.getTasks(),
+        project.is_shared ? api.getSharedTasks().catch(() => []) : Promise.resolve([]),
+      ]);
+      const projectTasks = [...allTasks, ...sharedTasks].filter((task: any) => 
         String(task.project_id) === String(project.id)
       );
       setTasks(projectTasks);
@@ -551,6 +558,11 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
                   {project.description}
                 </p>
               )}
+              {project.is_shared && (
+                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">
+                  Geteilt von {project.shared_by || 'unbekannt'}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -658,6 +670,11 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
                           {note.title || note.name}
                         </h3>
+                        {note.owner_username && (
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1">
+                            Von {note.owner_username}
+                          </p>
+                        )}
                         {note.tags && note.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {note.tags.map((tag: string) => (
@@ -820,6 +837,11 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
                       }`}>
                         {task.title}
                       </span>
+                      {task.owner_username && (
+                        <span className="text-[11px] text-gray-500 dark:text-gray-400 hidden sm:inline">
+                          Von {task.owner_username}
+                        </span>
+                      )}
                       {task.priority && (
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                           task.priority === 'high' ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400' :

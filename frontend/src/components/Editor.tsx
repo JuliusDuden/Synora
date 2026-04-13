@@ -385,7 +385,7 @@ export default function Editor({ noteName, onNoteChange, onNoteDeleted }: Editor
             onChange={setContent}
             isDark={isDark}
             showToolbar={false}
-            showMarkdownSyntaxOnActiveLine={true}
+            showMarkdownSyntaxOnActiveLine={false}
           />
         )}
       </div>
