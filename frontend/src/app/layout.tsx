@@ -1,6 +1,13 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { ReactNode } from 'react';
+import { Manrope } from 'next/font/google';
+
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-ui',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Synora - Think Beyond.',
@@ -14,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={manrope.className}>{children}</body>
     </html>
   );
 }

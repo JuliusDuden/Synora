@@ -43,6 +43,10 @@ class IndexService:
                 modified TIMESTAMP
             )
         """)
+
+        # Supporting indexes for metadata lookups and ordering.
+        await self.db.execute("CREATE INDEX IF NOT EXISTS idx_notes_modified ON notes(modified DESC)")
+        await self.db.execute("CREATE INDEX IF NOT EXISTS idx_notes_tags ON notes(tags)")
         
         # Create FTS5 virtual table for full-text search
         await self.db.execute("""
@@ -135,13 +139,13 @@ class IndexService:
     async def get_backlinks(self, note_name: str) -> List[str]:
         """Get notes that link to this note"""
         cursor = await self.db.execute("""
-            SELECT name FROM notes WHERE links LIKE ?
+            SELECT name, links FROM notes WHERE links LIKE ?
         """, (f"%{note_name}%",))
         
         backlinks = []
         async for row in cursor:
             # Verify the link is actually present
-            links = row[0]
+            links = row[1]
             if links:
                 link_list = links.split(",")
                 if note_name in link_list:

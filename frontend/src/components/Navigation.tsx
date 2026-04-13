@@ -6,9 +6,10 @@ import { useTranslation } from '@/lib/useTranslation';
 interface NavigationProps {
   currentView: string;
   onViewChange: (view: string) => void;
+  compact?: boolean;
 }
 
-export default function Navigation({ currentView, onViewChange }: NavigationProps) {
+export default function Navigation({ currentView, onViewChange, compact = false }: NavigationProps) {
   const { t } = useTranslation();
   
   const navItems = [
@@ -34,16 +35,21 @@ export default function Navigation({ currentView, onViewChange }: NavigationProp
             onClick={() => onViewChange(item.id)}
             title={item.label}
             className={`
-              flex items-center justify-center p-3 rounded-lg
+              flex items-center ${compact ? 'justify-center' : 'justify-start gap-3'} p-3 rounded-xl
               transition-all duration-200
               ${
                 isActive
-                  ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  ? 'brand-pill text-white shadow-lg shadow-sky-500/20'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60'
               }
             `}
           >
-            <Icon size={20} className={isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'} />
+            <Icon size={20} className={isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'} />
+            {!compact && (
+              <span className={`text-sm font-medium ${isActive ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>
+                {item.label}
+              </span>
+            )}
           </button>
         );
       })}

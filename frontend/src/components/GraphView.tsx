@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api, type GraphData as ApiGraphData } from '@/lib/api';
+import { Pause, Play, RotateCcw, LocateFixed, MousePointer2, ZoomIn } from 'lucide-react';
 
 interface Node {
   id: string;
@@ -625,7 +626,7 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
       />
 
       {/* Stats Overlay */}
-      <div className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur-sm text-white px-4 py-3 rounded-lg space-y-1 text-sm font-mono border border-indigo-500/30">
+      <div className="absolute top-4 left-4 glass-panel text-slate-800 dark:text-slate-100 px-4 py-3 rounded-xl space-y-1 text-sm font-mono border border-white/60 dark:border-slate-500/30">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
           <span>{stats.nodes} Nodes</span>
@@ -644,28 +645,35 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
       <div className="absolute top-4 right-4 flex flex-col gap-2">
         <button
           onClick={toggleSimulation}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-indigo-400/30"
+          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-indigo-400/30"
         >
-          {isSimulating ? '⏸ Pause' : '▶ Play'}
+          {isSimulating ? <Pause size={14} /> : <Play size={14} />}
+          <span>{isSimulating ? 'Pause' : 'Play'}</span>
         </button>
         <button
           onClick={handleRestart}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-purple-400/30"
+          className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-purple-400/30"
         >
-          🔄 Restart
+          <RotateCcw size={14} />
+          <span>Restart</span>
         </button>
         <button
           onClick={handleReset}
-          className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-slate-500/30"
+          className="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-slate-500/30"
         >
-          🎯 Center
+          <LocateFixed size={14} />
+          <span>Center</span>
         </button>
       </div>
 
       {/* Hints */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-sm text-white px-4 py-2 rounded-lg text-sm border border-indigo-500/30">
-        <span className="opacity-70">
-          🖱️ Click & Drag nodes • 🔍 Scroll to zoom • ⏸️ Pause for details
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 glass-panel text-slate-700 dark:text-slate-200 px-4 py-2 rounded-xl text-sm border border-white/60 dark:border-slate-500/30">
+        <span className="opacity-80 inline-flex items-center gap-2">
+          <MousePointer2 size={14} />
+          <span>Drag nodes</span>
+          <span className="opacity-50">•</span>
+          <ZoomIn size={14} />
+          <span>Scroll to zoom</span>
         </span>
       </div>
     </div>

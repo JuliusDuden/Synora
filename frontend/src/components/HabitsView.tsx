@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, Flame, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Calendar, Flame, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 import { api } from '@/lib/api';
 
@@ -72,7 +72,7 @@ export default function HabitsView() {
       const ids = data.map(h => h.id);
       const uniqueIds = new Set(ids);
       if (ids.length !== uniqueIds.size) {
-        console.error('⚠️ DUPLICATE IDs DETECTED!', ids);
+        console.error('Duplicate IDs detected!', ids);
       }
       // CRITICAL FIX: Ensure all IDs are strings for consistent comparison
       const normalizedHabits = data.map(h => ({
@@ -376,7 +376,7 @@ export default function HabitsView() {
                           }`}
                         >
                           {todayCompleted && (
-                            <span className="text-white text-sm font-bold">✓</span>
+                            <Check size={14} className="text-white" />
                           )}
                         </button>
 
@@ -465,7 +465,7 @@ export default function HabitsView() {
                                   } flex items-center justify-center`}
                                   title={`${date.getDate()}. ${date.toLocaleDateString('de-DE', { month: 'long' })}`}
                                 >
-                                  {completed ? '✓' : date.getDate()}
+                                  {completed ? <Check size={12} className="text-white" /> : date.getDate()}
                                 </button>
                               );
                             })}

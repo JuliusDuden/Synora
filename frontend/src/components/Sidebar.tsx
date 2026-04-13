@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api, type NoteList } from '@/lib/api';
-import { FileText, Plus, Calendar, Tag, FolderPlus, ArrowUpDown, ChevronDown, ChevronRight, Folder, Trash2, Edit2, Bookmark, Star, FolderOpen, Palette, Move, Share2, Users } from 'lucide-react';
+import { FileText, Plus, Calendar, Tag, FolderPlus, ArrowUpDown, ChevronDown, ChevronRight, Folder, Trash2, Edit2, Bookmark, Star, FolderOpen, Palette, Move, Share2, Users, X } from 'lucide-react';
 import ShareDialog from './ShareDialog';
 import { useTranslation } from '@/lib/useTranslation';
 
@@ -1100,8 +1100,8 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                   onClick={() => setFolderColor('')}
                   className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:scale-110 transition-transform flex items-center justify-center text-xs"
                 >
-                  ✕
-                  </button>
+                  <X size={12} />
+                </button>
               </div>
             </div>
           )}
@@ -1115,9 +1115,10 @@ export default function Sidebar({ currentNote, onNoteSelect, onCreateNote }: Sid
                   <button
                     key={project.id}
                     onClick={() => assignProject(project.id)}
-                    className="w-full px-4 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="w-full px-4 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 inline-flex items-center gap-2"
                   >
-                    📁 {project.name}
+                    <Folder size={14} />
+                    {project.name}
                   </button>
                 ))}
               </div>

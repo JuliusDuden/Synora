@@ -5,6 +5,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/useTranslation';
 import { api } from '@/lib/api';
 
+interface DashboardProps {
+  onNavigate?: (view: string) => void;
+  onCreateNote?: () => void;
+}
+
 interface Stats {
   totalNotes: number;
   totalProjects: number;
@@ -12,9 +17,11 @@ interface Stats {
   completedTasks: number;
   totalIdeas: number;
   activeHabits: number;
+  totalConnects: number;
+  sharedWithMe: number;
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onNavigate, onCreateNote }: DashboardProps) {
   const { t } = useTranslation();
   const [stats, setStats] = useState<Stats>({
     totalNotes: 0,
@@ -23,6 +30,8 @@ export default function Dashboard() {
     completedTasks: 0,
     totalIdeas: 0,
     activeHabits: 0,
+    totalConnects: 0,
+    sharedWithMe: 0,
   });
 
   useEffect(() => {
@@ -32,12 +41,14 @@ export default function Dashboard() {
   const loadStats = async () => {
     try {
       // Load all data from backend API
-      const [notes, projects, tasks, ideas, habits] = await Promise.all([
+      const [notes, projects, tasks, ideas, habits, connects, sharedItems] = await Promise.all([
         api.getAllNotes().catch(() => []),
         api.getProjects().catch(() => []),
         api.getTasks().catch(() => []),
         api.getIdeas().catch(() => []),
         api.getHabits().catch(() => []),
+        api.getConnects().catch(() => []),
+        api.getItemsSharedWithMe().catch(() => []),
       ]);
       
       setStats({
@@ -52,6 +63,8 @@ export default function Dashboard() {
           const today = new Date().toISOString().split('T')[0];
           return h.last_completed === today;
         }).length,
+        totalConnects: connects.length,
+        sharedWithMe: sharedItems.length,
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -109,6 +122,34 @@ export default function Dashboard() {
               year: 'numeric' 
             })}
           </p>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="glass-panel rounded-2xl p-4 sm:p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">
+              Schnellzugriff
+            </h2>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Fokus auf die wichtigsten Aktionen</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <button onClick={() => onCreateNote?.()} className="soft-hover glass-panel rounded-xl p-3 text-left">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Neue Notiz</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Direkt Gedanken erfassen</p>
+            </button>
+            <button onClick={() => onNavigate?.('tasks')} className="soft-hover glass-panel rounded-xl p-3 text-left">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Aufgaben öffnen</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Todo, In Progress, Done</p>
+            </button>
+            <button onClick={() => onNavigate?.('projects')} className="soft-hover glass-panel rounded-xl p-3 text-left">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Projekte verwalten</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Planung und Priorisierung</p>
+            </button>
+            <button onClick={() => onNavigate?.('connects')} className="soft-hover glass-panel rounded-xl p-3 text-left">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Connects & Sharing</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Zusammenarbeit im Blick</p>
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -202,12 +243,19 @@ export default function Dashboard() {
                 </div>
                 <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">{stats.totalProjects}</span>
               </div>
+              <div className="flex items-center justify-between py-1.5 sm:py-2 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <Activity size={14} className="sm:w-4 sm:h-4 text-gray-400" />
+                  <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">Connects</span>
+                </div>
+                <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">{stats.totalConnects}</span>
+              </div>
               <div className="flex items-center justify-between py-1.5 sm:py-2">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <Lightbulb size={14} className="sm:w-4 sm:h-4 text-gray-400" />
-                  <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">{t.dashboard.stats.ideas}</span>
+                  <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">Geteilte Inhalte</span>
                 </div>
-                <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">{stats.totalIdeas}</span>
+                <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">{stats.sharedWithMe}</span>
               </div>
             </div>
           </div>

@@ -11,6 +11,7 @@
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
     "@tiptap/extension-code-block-lowlight": "^3.10.1",
+    "@tiptap/extension-focus": "^3.22.3",
     "@tiptap/extension-image": "^3.10.1",
     "@tiptap/extension-link": "^3.10.1",
     "@tiptap/extension-table": "^3.10.1",
@@ -27,6 +28,7 @@
     "lowlight": "^3.3.0",
     "lucide-react": "^0.309.0",
     "markdown-it": "^14.0.0",
+    "markdown-it-task-lists": "^2.1.1",
     "marked": "^16.4.1",
     "next": "^14.2.33",
     "react": "^18.2.0",

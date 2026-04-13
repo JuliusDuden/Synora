@@ -12,6 +12,7 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Focus from '@tiptap/extension-focus';
 import { common, createLowlight } from 'lowlight';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -52,6 +53,8 @@ interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   isDark: boolean;
+  showToolbar?: boolean;
+  showMarkdownSyntaxOnActiveLine?: boolean;
 }
 
 interface ContextMenu {
@@ -186,7 +189,13 @@ const uploadBase64ImagesPlugin = () => {
   });
 };
 
-export default function RichTextEditor({ content, onChange, isDark }: RichTextEditorProps) {
+export default function RichTextEditor({
+  content,
+  onChange,
+  isDark,
+  showToolbar = true,
+  showMarkdownSyntaxOnActiveLine = false,
+}: RichTextEditorProps) {
   const isLocalUpdate = useRef(false);
   const lastMarkdown = useRef('');
   const isInitialized = useRef(false);
@@ -227,6 +236,10 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
       TaskList,
       TaskItem.configure({
         nested: true,
+      }),
+      Focus.configure({
+        className: 'has-focus',
+        mode: 'all',
       }),
       Extension.create({
         name: 'uploadBase64Images',
@@ -422,10 +435,23 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
   }
 
   const addLink = () => {
-    const url = window.prompt('Enter URL:');
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run();
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to).trim();
+    const text = selectedText || window.prompt('Link text:', '') || '';
+    if (!text) return;
+
+    const inputUrl = window.prompt('Enter URL (https://...)', 'https://');
+    if (!inputUrl) return;
+
+    const normalizedUrl = /^https?:\/\//i.test(inputUrl) ? inputUrl : `https://${inputUrl}`;
+
+    if (selectedText) {
+      editor.chain().focus().extendMarkRange('link').setLink({ href: normalizedUrl }).run();
+      return;
     }
+
+    // For empty selection, insert explicit markdown-style link text as anchor HTML.
+    editor.chain().focus().insertContent(`<a href="${normalizedUrl}">${text}</a>`).run();
   };
 
   const addImage = () => {
@@ -447,8 +473,9 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
         console.log('Upload result:', result);
         console.log('Inserting image with URL:', result.url);
         
-        // Insert image with uploaded URL
-        editor.chain().focus().setImage({ src: result.url }).run();
+        // Insert image with alt text derived from filename.
+        const altText = file.name.replace(/\.[^.]+$/, '') || 'image';
+        editor.chain().focus().setImage({ src: result.url, alt: altText }).run();
         
         console.log('Image inserted successfully');
           
@@ -519,8 +546,8 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
         console.log('Upload result:', result);
         console.log('Inserting image with URL:', result.url);
         
-        // Insert image with uploaded URL
-        editor.chain().focus().setImage({ src: result.url }).run();
+        const altText = file.name.replace(/\.[^.]+$/, '') || 'image';
+        editor.chain().focus().setImage({ src: result.url, alt: altText }).run();
         
         console.log('Image inserted successfully');
           
@@ -565,11 +592,12 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
 
   return (
     <div 
-      className="h-full flex flex-col bg-white dark:bg-gray-900"
+      className={`h-full flex flex-col bg-white dark:bg-gray-900 ${showMarkdownSyntaxOnActiveLine ? 'live-preview-editor' : ''}`}
       onContextMenu={handleContextMenu}
       onClick={closeContextMenu}
     >
       {/* Toolbar */}
+      {showToolbar && (
       <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center gap-1 px-3 py-2 overflow-x-auto flex-shrink-0">
         {/* Undo/Redo */}
         <button
@@ -740,6 +768,7 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
           <TableIcon size={18} />
         </button>
       </div>
+      )}
 
       {/* Editor Content */}
       <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
@@ -771,6 +800,52 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
             margin-top: 1.6em;
             margin-bottom: 0.6em;
             line-height: 1.6;
+          }
+          .live-preview-editor .ProseMirror h1.has-focus,
+          .live-preview-editor .ProseMirror h2.has-focus,
+          .live-preview-editor .ProseMirror h3.has-focus,
+          .live-preview-editor .ProseMirror p.has-focus,
+          .live-preview-editor .ProseMirror blockquote.has-focus,
+          .live-preview-editor .ProseMirror li.has-focus > div {
+            position: relative;
+          }
+          .live-preview-editor .ProseMirror h1.has-focus::before {
+            content: '# ';
+            color: rgb(148 163 184);
+            margin-right: 0.2rem;
+          }
+          .live-preview-editor .ProseMirror h2.has-focus::before {
+            content: '## ';
+            color: rgb(148 163 184);
+            margin-right: 0.2rem;
+          }
+          .live-preview-editor .ProseMirror h3.has-focus::before {
+            content: '### ';
+            color: rgb(148 163 184);
+            margin-right: 0.2rem;
+          }
+          .live-preview-editor .ProseMirror blockquote.has-focus::before {
+            content: '> ';
+            color: rgb(148 163 184);
+            margin-right: 0.2rem;
+          }
+          .live-preview-editor .ProseMirror ul:not([data-type="taskList"]) > li.has-focus::before {
+            content: '- ';
+            color: rgb(148 163 184);
+            margin-right: 0.35rem;
+          }
+          .live-preview-editor .ProseMirror ol > li.has-focus::before {
+            content: '1. ';
+            color: rgb(148 163 184);
+            margin-right: 0.35rem;
+          }
+          .dark .live-preview-editor .ProseMirror h1.has-focus::before,
+          .dark .live-preview-editor .ProseMirror h2.has-focus::before,
+          .dark .live-preview-editor .ProseMirror h3.has-focus::before,
+          .dark .live-preview-editor .ProseMirror blockquote.has-focus::before,
+          .dark .live-preview-editor .ProseMirror ul:not([data-type="taskList"]) > li.has-focus::before,
+          .dark .live-preview-editor .ProseMirror ol > li.has-focus::before {
+            color: rgb(148 163 184 / 0.95);
           }
           .ProseMirror p {
             margin-top: 1.25em;
@@ -841,6 +916,10 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
             margin-top: 0.5em;
             margin-bottom: 0.5em;
           }
+          .ProseMirror li > p {
+            margin: 0;
+            line-height: 1.55;
+          }
           .ProseMirror ul[data-type="taskList"] {
             list-style: none;
             padding: 0;
@@ -854,8 +933,43 @@ export default function RichTextEditor({ content, onChange, isDark }: RichTextEd
             margin-right: 0.5rem;
             user-select: none;
           }
+          .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 9999px;
+            border: 1.5px solid rgba(120, 140, 180, 0.55);
+            background: transparent;
+            position: relative;
+            margin-top: 0.2rem;
+            cursor: pointer;
+          }
+          .dark .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+            background: transparent;
+            border-color: rgba(140, 170, 220, 0.5);
+          }
+          .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+            background: linear-gradient(145deg, #36c1ff, #1f7cff);
+            border-color: #1f7cff;
+          }
+          .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+            content: '';
+            position: absolute;
+            left: 0.31rem;
+            top: 0.08rem;
+            width: 0.32rem;
+            height: 0.58rem;
+            border: solid #fff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+          }
           .ProseMirror ul[data-type="taskList"] li > div {
             flex: 1 1 auto;
+          }
+          .ProseMirror ul[data-type="taskList"] li > div > p {
+            margin: 0;
+            line-height: 1.55;
           }
           .ProseMirror a {
             color: rgb(99 102 241);

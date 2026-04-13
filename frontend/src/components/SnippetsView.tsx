@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { api, getSnippetsStorageKey } from '@/lib/api';
 import { 
   Plus, Trash2, Pin, Check, X, List, CheckSquare, Code2, 
-  Image as ImageIcon, Mic, Link2, Home, Search, Bell, 
+  Image as ImageIcon, Mic, Link2, Home, Search, Bell, FileText, Folder,
   Clock, StopCircle, PlayCircle, Pause
 } from 'lucide-react';
 
@@ -1210,7 +1210,7 @@ function SnippetCard({
                 className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 <Link2 size={8} className="sm:w-2.5 sm:h-2.5" />
-                <span className="font-medium">{conn.type === 'note' ? '📝' : '📁'}</span>
+                {conn.type === 'note' ? <FileText size={10} className="sm:w-3 sm:h-3" /> : <Folder size={10} className="sm:w-3 sm:h-3" />}
                 {conn.title}
                 <button
                   onClick={(e) => {

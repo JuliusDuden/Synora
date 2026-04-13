@@ -162,7 +162,7 @@ class API {
   }
 
   async updateNote(name: string, content: string, newName?: string): Promise<void> {
-    const res = await fetch(`${API_URL}/api/notes/${encodeURIComponent(name)}`, {
+    const res = await this.requestWithRetries(`${API_URL}/api/notes/${encodeURIComponent(name)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -170,7 +170,11 @@ class API {
       },
       body: JSON.stringify({ content, name: newName }),
     });
-    if (!res.ok) throw new Error('Failed to update note');
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      const errorMessage = errorData.detail || res.statusText || 'Failed to update note';
+      throw new Error(errorMessage);
+    }
   }
 
   async deleteNote(name: string): Promise<void> {

@@ -1,0 +1,19 @@
+# Local development dependencies (Python 3.14 compatible)
+fastapi>=0.115,<1
+uvicorn[standard]>=0.32,<1
+python-multipart>=0.0.12
+pydantic>=2.11
+pydantic-settings>=2.5
+email-validator>=2.2
+python-frontmatter>=1.1
+markdown>=3.7
+aiosqlite>=0.20
+python-dotenv>=1.0
+websockets>=13
+PyYAML>=6.0
+bcrypt>=4.1
+PyJWT>=2.8
+pyotp>=2.9
+qrcode>=8.2
+cryptography>=44
+requests>=2.31

@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const encryptionManager = EncryptionManager.getInstance();
         await encryptionManager.initialize(password, data.user.encryption_salt);
-        console.log('✅ E2E Encryption initialized');
+        console.log('E2E encryption initialized');
       } catch (error) {
         console.error('Failed to initialize encryption:', error);
       }
@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const encryptionManager = EncryptionManager.getInstance();
         await encryptionManager.initialize(password, data.user.encryption_salt);
-        console.log('✅ E2E Encryption initialized for new user');
+        console.log('E2E encryption initialized for new user');
       } catch (error) {
         console.error('Failed to initialize encryption:', error);
       }
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clear encryption key from memory
     const encryptionManager = EncryptionManager.getInstance();
     encryptionManager.clear();
-    console.log('🔐 Encryption key cleared');
+    console.log('Encryption key cleared');
   };
 
   return (

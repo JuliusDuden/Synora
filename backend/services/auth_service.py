@@ -10,9 +10,10 @@ import qrcode
 import io
 import base64
 from fastapi import HTTPException, status
+import os
 
 # Configuration
-SECRET_KEY = "your-super-secret-key-change-in-production-min-32-chars!"  # TODO: Move to environment variable
+SECRET_KEY = os.getenv("JWT_SECRET", "your-super-secret-key-change-in-production-min-32-chars!")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
