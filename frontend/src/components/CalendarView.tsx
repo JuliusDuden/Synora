@@ -338,6 +338,8 @@ export default function CalendarView() {
     return cells;
   }, [monthCursor, startOffset, daysInMonth]);
 
+  const weekRows = Math.max(4, Math.ceil(monthCells.length / 7));
+
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (let day = 1; day <= daysInMonth; day++) {
@@ -794,8 +796,8 @@ export default function CalendarView() {
   }, []);
 
   return (
-    <div className="h-full overflow-y-auto bg-transparent">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
+    <div className="h-full overflow-hidden bg-transparent">
+      <div className="w-full h-full p-3 sm:p-5 lg:p-6 flex flex-col gap-4">
         <div className="ui-surface-strong rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100">Kalender</h1>
@@ -835,52 +837,98 @@ export default function CalendarView() {
 
         {syncMessage && <div className="ui-surface rounded-xl px-4 py-2 text-sm text-slate-700 dark:text-slate-200">{syncMessage}</div>}
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="xl:col-span-2 ui-surface rounded-2xl p-4">
-            <div className="grid grid-cols-7 gap-2 mb-2 text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-              {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => (
-                <div key={d} className="px-2">{d}</div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-2">
-              {monthCells.map((cell, idx) => {
-                if (!cell.date) {
-                  return <div key={`empty-${idx}`} className="h-24 rounded-lg border border-transparent" />;
-                }
-                const dayEvents = eventsByDay.get(cell.date) || [];
-                const active = selectedDate === cell.date;
-                return (
-                  <button
-                    key={cell.date}
-                    onClick={() => {
-                      setSelectedDate(cell.date as string);
-                      setForm((prev) => ({ ...prev, startDate: cell.date as string, endDate: cell.date as string }));
-                    }}
-                    className={`h-24 rounded-xl border p-2 text-left transition-colors ${
-                      active
-                        ? 'border-slate-500 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                        : 'border-white/45 dark:border-slate-700/45 hover:bg-white/50 dark:hover:bg-slate-800/50 text-slate-800 dark:text-slate-200'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold mb-1">{Number(cell.date.slice(8, 10))}</div>
-                    <div className="space-y-1">
-                      {dayEvents.slice(0, 2).map((ev) => {
-                        const category = categoryById.get(ev.categoryId);
-                        return (
-                          <div key={ev.id} className="text-[11px] truncate px-1.5 py-0.5 rounded" style={{ backgroundColor: category?.color || '#334155', color: '#fff' }}>
-                            {ev.title}
-                          </div>
-                        );
-                      })}
-                      {dayEvents.length > 2 && <div className="text-[11px] opacity-70">+{dayEvents.length - 2} mehr</div>}
-                    </div>
-                  </button>
-                );
-              })}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
+          <div className="lg:col-span-8 min-h-0 flex flex-col gap-4">
+            <div className="ui-surface-strong rounded-2xl p-4 sm:p-5 flex-1 min-h-0 flex flex-col">
+              <div className="grid grid-cols-7 gap-2 mb-3 text-xs text-slate-500 dark:text-slate-400 uppercase tracking-[0.18em]">
+                {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => (
+                  <div key={d} className="px-2">{d}</div>
+                ))}
+              </div>
+              <div
+                className="grid grid-cols-7 gap-2 flex-1 min-h-0"
+                style={{ gridTemplateRows: `repeat(${weekRows}, minmax(0, 1fr))` }}
+              >
+                {monthCells.map((cell, idx) => {
+                  if (!cell.date) {
+                    return <div key={`empty-${idx}`} className="rounded-xl border border-transparent" />;
+                  }
+                  const dayEvents = eventsByDay.get(cell.date) || [];
+                  const active = selectedDate === cell.date;
+                  return (
+                    <button
+                      key={cell.date}
+                      onClick={() => {
+                        setSelectedDate(cell.date as string);
+                        setForm((prev) => ({ ...prev, startDate: cell.date as string, endDate: cell.date as string }));
+                      }}
+                      className={`h-full min-h-[64px] sm:min-h-[76px] xl:min-h-[84px] rounded-xl border p-2 text-left transition-colors overflow-hidden ${
+                        active
+                          ? 'border-slate-500 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-lg'
+                          : 'border-white/45 dark:border-slate-700/45 hover:bg-white/50 dark:hover:bg-slate-800/50 text-slate-800 dark:text-slate-200'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold mb-1">{Number(cell.date.slice(8, 10))}</div>
+                      <div className="space-y-1">
+                        {dayEvents.slice(0, 3).map((ev) => {
+                          const category = categoryById.get(ev.categoryId);
+                          return (
+                            <div key={ev.id} className="text-[11px] truncate px-1.5 py-0.5 rounded" style={{ backgroundColor: category?.color || '#334155', color: '#fff' }}>
+                              {ev.title}
+                            </div>
+                          );
+                        })}
+                        {dayEvents.length > 3 && <div className="text-[11px] opacity-70">+{dayEvents.length - 3} mehr</div>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="lg:col-span-4 min-h-0 lg:overflow-y-auto pr-1 space-y-4">
+            <div className="ui-surface rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Tagesubersicht: {new Date(selectedDate).toLocaleDateString('de-DE')}</h2>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{selectedEvents.length} Eintrage</span>
+              </div>
+              {selectedEvents.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Keine Termine fur diesen Tag.</p>
+              ) : (
+                <div className="space-y-2 max-h-[38vh] overflow-y-auto pr-1">
+                  {selectedEvents.map((ev) => {
+                    const category = categoryById.get(ev.categoryId);
+                    return (
+                      <div key={ev.id} className="rounded-xl border border-white/45 dark:border-slate-700/45 bg-white/45 dark:bg-slate-800/45 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: category?.color || '#334155' }} />
+                              {ev.title}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              {new Date(ev.start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              {' - '}
+                              {new Date(ev.end).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <div className="inline-flex items-center gap-1">
+                            <button onClick={() => editEvent(ev)} className="text-slate-500 hover:text-sky-600" title="Bearbeiten">
+                              <Pencil size={15} />
+                            </button>
+                            <button onClick={() => deleteEvent(ev.id)} className="text-slate-500 hover:text-red-500" title="Loeschen">
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <div className="ui-surface rounded-2xl p-4">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
                 {editingEventId ? 'Termin bearbeiten' : 'Termin erstellen'}
@@ -1072,82 +1120,13 @@ export default function CalendarView() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="ui-surface rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Termine am {new Date(selectedDate).toLocaleDateString('de-DE')}</h2>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{selectedEvents.length} Eintrage</span>
-          </div>
-          {selectedEvents.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Keine Termine fur diesen Tag.</p>
-          ) : (
-            <div className="space-y-2">
-              {selectedEvents.map((ev) => {
-                const category = categoryById.get(ev.categoryId);
-                return (
-                  <div key={ev.id} className="rounded-xl border border-white/45 dark:border-slate-700/45 bg-white/45 dark:bg-slate-800/45 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: category?.color || '#334155' }} />
-                          {ev.title}
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          {new Date(ev.start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                          {' - '}
-                          {new Date(ev.end).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                        {ev.recurrence !== 'none' && (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                            Wiederholung: {ev.recurrence} / alle {ev.recurrenceInterval}
-                            {ev.recurrenceUntil ? ` bis ${new Date(`${ev.recurrenceUntil}T00:00:00`).toLocaleDateString('de-DE')}` : ''}
-                          </div>
-                        )}
-                      </div>
-                      <div className="inline-flex items-center gap-1">
-                        <button onClick={() => editEvent(ev)} className="text-slate-500 hover:text-sky-600" title="Bearbeiten">
-                          <Pencil size={15} />
-                        </button>
-                        <button onClick={() => deleteEvent(ev.id)} className="text-slate-500 hover:text-red-500" title="Loeschen">
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {ev.location && (
-                        <button
-                          onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location)}`, '_blank', 'noopener,noreferrer')}
-                          className="ui-button-ghost rounded-md px-2 py-1 text-xs inline-flex items-center gap-1"
-                        >
-                          <MapPin size={13} /> Ort offnen
-                        </button>
-                      )}
-                      {ev.meetingUrl && (
-                        <button
-                          onClick={() => window.open(ev.meetingUrl, '_blank', 'noopener,noreferrer')}
-                          className="ui-button-ghost rounded-md px-2 py-1 text-xs inline-flex items-center gap-1"
-                        >
-                          <Video size={13} /> Meeting offnen
-                        </button>
-                      )}
-                      <button onClick={() => openGoogleEvent(ev)} className="ui-button-ghost rounded-md px-2 py-1 text-xs inline-flex items-center gap-1">
-                        <ExternalLink size={13} /> In Google vorbereiten
-                      </button>
-                    </div>
-                    {ev.notes && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{ev.notes}</p>}
-                  </div>
-                );
-              })}
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-1 gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <div className="ui-surface rounded-xl p-3 inline-flex items-center gap-2"><Briefcase size={14} /> Kategorien wie Arbeit/Privat frei anlegbar</div>
+              <div className="ui-surface rounded-xl p-3 inline-flex items-center gap-2"><Home size={14} /> Ort speichern, Meeting-Link oeffnen und Termin bearbeiten</div>
+              <div className="ui-surface rounded-xl p-3 inline-flex items-center gap-2"><Tag size={14} /> ICS Import/Export + Feed-Sync fuer Google/Notion</div>
             </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-500 dark:text-slate-400">
-          <div className="ui-surface rounded-xl p-3 inline-flex items-center gap-2"><Briefcase size={14} /> Kategorien wie Arbeit/Privat frei anlegbar</div>
-          <div className="ui-surface rounded-xl p-3 inline-flex items-center gap-2"><Home size={14} /> Ort speichern, Meeting-Link oeffnen und Termin bearbeiten</div>
-          <div className="ui-surface rounded-xl p-3 inline-flex items-center gap-2"><Tag size={14} /> ICS Import/Export + Feed-Sync fuer Google/Notion</div>
+          </div>
         </div>
       </div>
     </div>

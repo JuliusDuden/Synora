@@ -18,7 +18,7 @@ Update the server and install the required packages:
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y git curl openssl ca-certificates docker.io docker-compose-plugin
+sudo apt install -y git curl openssl ca-certificates docker.io docker-compose
 ```
 
 Enable Docker and make sure it starts on boot:
@@ -134,9 +134,9 @@ If you use a public domain, open the app in the browser at:
 
 ```bash
 git pull
-docker compose down
-docker compose build --no-cache
-docker compose up -d
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
 If you only changed notes or data, you usually do not need a rebuild.
