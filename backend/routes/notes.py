@@ -87,6 +87,45 @@ def get_db():
     return conn
 
 
+def _resolve_note_owner_for_project(
+    cursor: sqlite3.Cursor,
+    project_id: str,
+    current_user_id: str,
+) -> str:
+    """Resolve the target note owner based on project ownership and share permission."""
+    cursor.execute(
+        """
+        SELECT user_id FROM projects WHERE id = ?
+        """,
+        (project_id,),
+    )
+    project_row = cursor.fetchone()
+    if not project_row:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project_owner_id = project_row["user_id"]
+    if project_owner_id == current_user_id:
+        return current_user_id
+
+    cursor.execute(
+        """
+        SELECT permission
+        FROM shared_items
+        WHERE item_type = 'project'
+          AND item_id = ?
+          AND shared_with_id = ?
+        """,
+        (project_id, current_user_id),
+    )
+    share_row = cursor.fetchone()
+    if not share_row:
+        raise HTTPException(status_code=403, detail="No access to project")
+    if share_row["permission"] != "edit":
+        raise HTTPException(status_code=403, detail="No edit permission for project")
+
+    return project_owner_id
+
+
 @router.get("", response_model=List[NoteList])
 async def list_notes(current_user: User = Depends(get_current_user)):
     """List all notes for current user"""
@@ -121,19 +160,31 @@ async def list_notes(current_user: User = Depends(get_current_user)):
 
 @router.get("/shared/all")
 async def list_shared_notes(current_user: User = Depends(get_current_user)):
-    """List all notes shared with the current user"""
+    """List all notes shared with the current user (direct or via shared project)."""
     conn = get_db()
     cursor = conn.cursor()
     
-    cursor.execute("""
-        SELECT n.id, n.name, n.path, n.title, n.project, n.tags, 
-               n.created_at, n.modified_at, u.username as owner_username, si.permission
+    cursor.execute(
+        """
+        SELECT DISTINCT n.id, n.name, n.path, n.title, n.project, n.tags,
+               n.created_at, n.modified_at, u.username as owner_username,
+               sn.permission AS note_permission,
+               sp.permission AS project_permission
         FROM notes n
-        JOIN shared_items si ON n.id = si.item_id AND si.item_type = 'note'
         JOIN users u ON n.user_id = u.id
-        WHERE si.shared_with_id = ?
+        LEFT JOIN shared_items sn
+            ON sn.item_type = 'note'
+           AND sn.item_id = n.id
+           AND sn.shared_with_id = ?
+        LEFT JOIN shared_items sp
+            ON sp.item_type = 'project'
+           AND sp.item_id = n.project
+           AND sp.shared_with_id = ?
+        WHERE sn.id IS NOT NULL OR sp.id IS NOT NULL
         ORDER BY n.modified_at DESC
-    """, (current_user.id,))
+        """,
+        (current_user.id, current_user.id),
+    )
     
     rows = cursor.fetchall()
     conn.close()
@@ -141,6 +192,7 @@ async def list_shared_notes(current_user: User = Depends(get_current_user)):
     notes_list = []
     for row in rows:
         tags = json.loads(row["tags"]) if row["tags"] else []
+        effective_permission = "edit" if row["note_permission"] == "edit" or row["project_permission"] == "edit" else "view"
         notes_list.append({
             "id": row["id"],
             "name": row["name"],
@@ -149,7 +201,7 @@ async def list_shared_notes(current_user: User = Depends(get_current_user)):
             "project": row["project"],
             "tags": tags,
             "owner_username": row["owner_username"],
-            "permission": row["permission"],
+            "permission": effective_permission,
             "is_shared": True
         })
     
@@ -180,6 +232,19 @@ async def get_note(name: str, current_user: User = Depends(get_current_user)):
             JOIN shared_items si ON n.id = si.item_id AND si.item_type = 'note'
             WHERE n.name = ? AND si.shared_with_id = ?
         """, (name, current_user.id))
+        row = cursor.fetchone()
+
+    # If still not found, try note access through shared project.
+    if not row:
+        cursor.execute(
+            """
+            SELECT n.*, si.permission
+            FROM notes n
+            JOIN shared_items si ON si.item_type = 'project' AND si.item_id = n.project
+            WHERE n.name = ? AND si.shared_with_id = ?
+            """,
+            (name, current_user.id),
+        )
         row = cursor.fetchone()
     
     conn.close()
@@ -225,18 +290,22 @@ async def create_note(note_data: NoteCreate, current_user: User = Depends(get_cu
         conn = get_db()
         cursor = conn.cursor()
         
-        # Check if note already exists for this user
+        # Extract metadata from frontmatter
+        metadata = parse_frontmatter(note_data.content)
+
+        target_user_id = current_user.id
+        if metadata.get('project'):
+            target_user_id = _resolve_note_owner_for_project(cursor, str(metadata['project']), current_user.id)
+
+        # Check if note already exists for the target owner
         cursor.execute("""
             SELECT id FROM notes 
             WHERE user_id = ? AND name = ?
-        """, (current_user.id, note_data.name))
+        """, (target_user_id, note_data.name))
         
         if cursor.fetchone():
             conn.close()
             raise HTTPException(status_code=409, detail="Note already exists")
-        
-        # Extract metadata from frontmatter
-        metadata = parse_frontmatter(note_data.content)
         
         # Create note
         note_id = str(uuid.uuid4())
@@ -251,7 +320,7 @@ async def create_note(note_data: NoteCreate, current_user: User = Depends(get_cu
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            note_id, current_user.id, note_data.name, path, 
+            note_id, target_user_id, note_data.name, path,
             note_data.content,
             metadata['title'], metadata['project'], json.dumps(metadata['tags']),
             0, now, now
@@ -309,12 +378,27 @@ async def update_note(
         """, (name, current_user.id))
         
         shared_row = cursor.fetchone()
-        if not shared_row:
-            conn.close()
-            raise HTTPException(status_code=404, detail="Note not found or no edit permission")
-        
-        is_shared_note = True
-        owner_id = shared_row[1]
+        if shared_row:
+            is_shared_note = True
+            owner_id = shared_row[1]
+        else:
+            # Allow editing notes that belong to a project shared with edit permission.
+            cursor.execute(
+                """
+                SELECT n.id, n.user_id
+                FROM notes n
+                JOIN shared_items si ON si.item_type = 'project' AND si.item_id = n.project
+                WHERE n.name = ? AND si.shared_with_id = ? AND si.permission = 'edit'
+                """,
+                (name, current_user.id),
+            )
+            project_shared_row = cursor.fetchone()
+            if not project_shared_row:
+                conn.close()
+                raise HTTPException(status_code=404, detail="Note not found or no edit permission")
+
+            is_shared_note = True
+            owner_id = project_shared_row[1]
     else:
         owner_id = row[1]
     

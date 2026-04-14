@@ -16,6 +16,7 @@ interface Project {
   modified_at: string;
   is_shared?: boolean;
   shared_by?: string;
+  permission?: 'view' | 'edit';
 }
 
 interface ProjectsViewProps {
@@ -333,6 +334,15 @@ export default function ProjectsView({ onProjectSelect, onNoteClick, selectedPro
                       {project.description}
                     </p>
                   )}
+                  <div className="mt-3">
+                    <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+                      project.permission === 'edit'
+                        ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300'
+                    }`}>
+                      {project.permission === 'edit' ? 'Bearbeiten' : 'Nur Lesen'}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -384,6 +394,7 @@ interface ProjectDetailViewProps {
 }
 
 function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewProps) {
+  const canEditSharedProject = !project.is_shared || project.permission === 'edit';
   const [notes, setNotes] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [snippets, setSnippets] = useState<any[]>([]);
@@ -480,6 +491,10 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
   };
 
   const createNote = async () => {
+    if (!canEditSharedProject) {
+      alert('Dieses Projekt ist nur mit Leserechten geteilt.');
+      return;
+    }
     if (!newNoteName.trim()) return;
 
     try {
@@ -514,6 +529,10 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
   };
 
   const createTask = async () => {
+    if (!canEditSharedProject) {
+      alert('Dieses Projekt ist nur mit Leserechten geteilt.');
+      return;
+    }
     if (!newTaskTitle.trim()) return;
 
     try {
@@ -560,7 +579,7 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
               )}
               {project.is_shared && (
                 <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">
-                  Geteilt von {project.shared_by || 'unbekannt'}
+                  Geteilt von {project.shared_by || 'unbekannt'} ({project.permission === 'edit' ? 'Bearbeiten' : 'Nur Lesen'})
                 </p>
               )}
             </div>
@@ -610,8 +629,13 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
               Notizen
             </h2>
             <button
+              disabled={!canEditSharedProject}
               onClick={() => setCreatingNote(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-xs font-medium transition-colors"
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                canEditSharedProject
+                  ? 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                  : 'bg-gray-100 dark:bg-gray-900 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              }`}
             >
               <Plus size={14} />
               Neue Note
@@ -761,8 +785,13 @@ function ProjectDetailView({ project, onBack, onNoteClick }: ProjectDetailViewPr
               Aufgaben
             </h2>
             <button
+              disabled={!canEditSharedProject}
               onClick={() => setCreatingTask(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-xs font-medium transition-colors"
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                canEditSharedProject
+                  ? 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                  : 'bg-gray-100 dark:bg-gray-900 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              }`}
             >
               <Plus size={14} />
               Neue Aufgabe

@@ -71,6 +71,54 @@ class Task(BaseModel):
     linked_notes: Optional[List[str]] = None
 
 
+def _resolve_task_owner_for_project(
+    cursor: sqlite3.Cursor,
+    project_id: Optional[str],
+    current_user_id: str,
+) -> str:
+    """Resolve which user should own a task for the given project.
+
+    Own project -> current user.
+    Shared project with edit permission -> project owner.
+    Shared project with view permission -> forbidden.
+    """
+    if not project_id:
+        return current_user_id
+
+    cursor.execute(
+        """
+        SELECT user_id FROM projects
+        WHERE id = ?
+        """,
+        (project_id,),
+    )
+    project_row = cursor.fetchone()
+    if not project_row:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project_owner_id = project_row["user_id"]
+    if project_owner_id == current_user_id:
+        return current_user_id
+
+    cursor.execute(
+        """
+        SELECT permission
+        FROM shared_items
+        WHERE item_type = 'project'
+          AND item_id = ?
+          AND shared_with_id = ?
+        """,
+        (project_id, current_user_id),
+    )
+    share_row = cursor.fetchone()
+    if not share_row:
+        raise HTTPException(status_code=403, detail="No access to project")
+    if share_row["permission"] != "edit":
+        raise HTTPException(status_code=403, detail="No edit permission for project")
+
+    return project_owner_id
+
+
 @router.get("", response_model=List[Task])
 async def list_tasks(
     completed: Optional[bool] = None,
@@ -131,6 +179,7 @@ async def create_task(
     conn = get_db()
     cursor = conn.cursor()
     
+    task_owner_id = _resolve_task_owner_for_project(cursor, task.project_id, current_user.id)
     task_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     
@@ -142,7 +191,7 @@ async def create_task(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        task_id, current_user.id, task.title, task.description, 0,
+        task_id, task_owner_id, task.title, task.description, 0,
         task.priority, task.due_date, task.project_id, now, now,
         json.dumps(task.tags) if task.tags else None,
         task.reminder,
@@ -180,18 +229,47 @@ async def update_task(
     conn = get_db()
     cursor = conn.cursor()
     
-    # Check if task exists
-    cursor.execute("""
-        SELECT * FROM tasks 
+    # Check if task exists as own task first
+    cursor.execute(
+        """
+        SELECT * FROM tasks
         WHERE id = ? AND user_id = ?
-    """, (task_id, current_user.id))
-    
+        """,
+        (task_id, current_user.id),
+    )
+
     row = cursor.fetchone()
+    task_owner_id = current_user.id
+
     if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Task not found")
+        # Allow updates for tasks in shared projects when permission is edit.
+        cursor.execute(
+            """
+            SELECT t.*
+            FROM tasks t
+            JOIN shared_items si ON si.item_type = 'project' AND si.item_id = t.project_id
+            WHERE t.id = ?
+              AND si.shared_with_id = ?
+              AND si.permission = 'edit'
+            """,
+            (task_id, current_user.id),
+        )
+        shared_row = cursor.fetchone()
+        if not shared_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        row = shared_row
+        task_owner_id = row["user_id"]
     
     update_data = task.model_dump(exclude_unset=True) if hasattr(task, 'model_dump') else task.dict(exclude_unset=True)
+
+    # If project assignment changes, enforce project permissions and owner consistency.
+    if 'project_id' in update_data:
+        target_owner_id = _resolve_task_owner_for_project(cursor, task.project_id, current_user.id)
+        if target_owner_id != task_owner_id:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Cannot move task to a project owned by another user")
 
     # Build update
     updates = []
@@ -235,7 +313,7 @@ async def update_task(
     updates.append("modified_at = ?")
     values.append(now)
     values.append(task_id)
-    values.append(current_user.id)
+    values.append(task_owner_id)
     
     cursor.execute(f"""
         UPDATE tasks 
@@ -306,18 +384,27 @@ async def delete_task(
 
 @router.get("/shared", response_model=List[Task])
 async def list_shared_tasks(current_user: User = Depends(get_current_user)):
-    """List all tasks shared with the current user"""
+    """List all tasks shared with the current user (directly or via shared projects)."""
     conn = get_db()
     cursor = conn.cursor()
     
-    cursor.execute("""
-        SELECT t.*, u.username as owner_username, si.permission
+    cursor.execute(
+        """
+        SELECT DISTINCT t.*
         FROM tasks t
-        JOIN shared_items si ON t.id = si.item_id AND si.item_type = 'task'
-        JOIN users u ON t.user_id = u.id
-        WHERE si.shared_with_id = ?
+        LEFT JOIN shared_items st
+            ON st.item_type = 'task'
+           AND st.item_id = t.id
+           AND st.shared_with_id = ?
+        LEFT JOIN shared_items sp
+            ON sp.item_type = 'project'
+           AND sp.item_id = t.project_id
+           AND sp.shared_with_id = ?
+        WHERE st.id IS NOT NULL OR sp.id IS NOT NULL
         ORDER BY t.due_date ASC, t.priority DESC
-    """, (current_user.id,))
+        """,
+        (current_user.id, current_user.id),
+    )
     
     rows = cursor.fetchall()
     conn.close()
