@@ -2,13 +2,16 @@
 Authentication Routes
 Handles user registration, login, and 2FA
 """
-from fastapi import APIRouter, HTTPException, Depends, status, Header
+from fastapi import APIRouter, HTTPException, Depends, status, Header, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 import sqlite3
 from datetime import datetime
 import uuid
 from pydantic import BaseModel
+from urllib.parse import urlparse
+import threading
+import time
 
 from models.user import (
     UserCreate, UserLogin, User, UserInDB, Token, 
@@ -32,6 +35,37 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "note
 class ProfileUpdate(BaseModel):
     username: Optional[str] = None
     avatar_url: Optional[str] = None
+
+
+AUTH_WINDOW_SECONDS = 60
+MAX_LOGIN_ATTEMPTS_PER_WINDOW = 12
+MAX_REGISTER_ATTEMPTS_PER_WINDOW = 5
+
+_AUTH_LIMITS: dict[str, list[float]] = {}
+_AUTH_LIMITS_LOCK = threading.Lock()
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    if forwarded:
+        return forwarded
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _is_rate_limited(bucket: str, limit: int) -> bool:
+    now = time.time()
+    cutoff = now - AUTH_WINDOW_SECONDS
+    with _AUTH_LIMITS_LOCK:
+        hits = _AUTH_LIMITS.get(bucket, [])
+        hits = [ts for ts in hits if ts >= cutoff]
+        if len(hits) >= limit:
+            _AUTH_LIMITS[bucket] = hits
+            return True
+        hits.append(now)
+        _AUTH_LIMITS[bucket] = hits
+        return False
 
 
 def get_db():
@@ -154,8 +188,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate):
+async def register(user_data: UserCreate, request: Request):
     """Register a new user"""
+    ip = _client_ip(request)
+    if _is_rate_limited(f"register:{ip}", MAX_REGISTER_ATTEMPTS_PER_WINDOW):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many registration attempts. Please try again later."
+        )
+
     conn = get_db()
     cursor = conn.cursor()
     
@@ -209,8 +250,16 @@ async def register(user_data: UserCreate):
 
 
 @router.post("/login", response_model=Token)
-async def login(credentials: UserLogin):
+async def login(credentials: UserLogin, request: Request):
     """Login user"""
+    ip = _client_ip(request)
+    bucket = f"login:{ip}:{credentials.email.casefold()}"
+    if _is_rate_limited(bucket, MAX_LOGIN_ATTEMPTS_PER_WINDOW):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again in a minute."
+        )
+
     conn = get_db()
     cursor = conn.cursor()
     
@@ -339,8 +388,19 @@ async def update_profile(profile: ProfileUpdate, current_user: User = Depends(ge
         values.append(username)
 
     if profile.avatar_url is not None:
+        avatar_url = profile.avatar_url.strip()
+        if avatar_url:
+            if len(avatar_url) > 2048:
+                conn.close()
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar URL is too long")
+
+            parsed = urlparse(avatar_url)
+            if parsed.scheme not in ("http", "https"):
+                conn.close()
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar URL must use http or https")
+
         updates.append("avatar_url = ?")
-        values.append(profile.avatar_url)
+        values.append(avatar_url or None)
 
     if not updates:
         conn.close()

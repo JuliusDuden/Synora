@@ -81,6 +81,16 @@ interface GlassPalette {
   };
 }
 
+interface ThemeAmbience {
+  bgTop: string;
+  bgBottom: string;
+  orb1: string;
+  orb2: string;
+  grid: string;
+  glassTint1: string;
+  glassTint2: string;
+}
+
 const DEFAULT_SETTINGS: Settings = {
   darkMode: false,
   language: 'de',
@@ -166,6 +176,89 @@ const THEME_PRESETS: Record<DesignPreset, ThemePalette> = {
   },
 };
 
+const THEME_AMBIENCE: Record<DesignPreset, { light: ThemeAmbience; dark: ThemeAmbience }> = {
+  aurora: {
+    light: {
+      bgTop: '#f5f9ff',
+      bgBottom: '#e9f0fb',
+      orb1: 'rgba(110, 164, 255, 0.28)',
+      orb2: 'rgba(123, 226, 255, 0.22)',
+      grid: 'rgba(255, 255, 255, 0.24)',
+      glassTint1: 'rgba(31, 124, 255, 0.18)',
+      glassTint2: 'rgba(54, 193, 255, 0.15)',
+    },
+    dark: {
+      bgTop: '#0e1a2d',
+      bgBottom: '#0a1323',
+      orb1: 'rgba(75, 132, 255, 0.28)',
+      orb2: 'rgba(59, 185, 227, 0.22)',
+      grid: 'rgba(168, 204, 255, 0.22)',
+      glassTint1: 'rgba(113, 167, 255, 0.24)',
+      glassTint2: 'rgba(105, 221, 255, 0.2)',
+    },
+  },
+  graphite: {
+    light: {
+      bgTop: '#f4f6fb',
+      bgBottom: '#e7ebf4',
+      orb1: 'rgba(133, 149, 181, 0.24)',
+      orb2: 'rgba(170, 182, 212, 0.2)',
+      grid: 'rgba(255, 255, 255, 0.2)',
+      glassTint1: 'rgba(79, 111, 255, 0.14)',
+      glassTint2: 'rgba(125, 140, 255, 0.12)',
+    },
+    dark: {
+      bgTop: '#141b2b',
+      bgBottom: '#0c111c',
+      orb1: 'rgba(89, 108, 153, 0.24)',
+      orb2: 'rgba(109, 149, 201, 0.18)',
+      grid: 'rgba(189, 200, 230, 0.18)',
+      glassTint1: 'rgba(138, 160, 255, 0.2)',
+      glassTint2: 'rgba(108, 184, 255, 0.18)',
+    },
+  },
+  forest: {
+    light: {
+      bgTop: '#f3fbf6',
+      bgBottom: '#e4f4ea',
+      orb1: 'rgba(85, 189, 158, 0.24)',
+      orb2: 'rgba(137, 232, 188, 0.2)',
+      grid: 'rgba(255, 255, 255, 0.22)',
+      glassTint1: 'rgba(14, 165, 162, 0.16)',
+      glassTint2: 'rgba(52, 211, 153, 0.14)',
+    },
+    dark: {
+      bgTop: '#0f211b',
+      bgBottom: '#091813',
+      orb1: 'rgba(34, 143, 125, 0.24)',
+      orb2: 'rgba(66, 179, 129, 0.2)',
+      grid: 'rgba(170, 236, 209, 0.18)',
+      glassTint1: 'rgba(45, 212, 191, 0.2)',
+      glassTint2: 'rgba(52, 211, 153, 0.18)',
+    },
+  },
+  sunset: {
+    light: {
+      bgTop: '#fff6ef',
+      bgBottom: '#f7e8db',
+      orb1: 'rgba(255, 153, 105, 0.24)',
+      orb2: 'rgba(255, 193, 124, 0.2)',
+      grid: 'rgba(255, 255, 255, 0.2)',
+      glassTint1: 'rgba(255, 122, 89, 0.18)',
+      glassTint2: 'rgba(255, 159, 67, 0.14)',
+    },
+    dark: {
+      bgTop: '#261817',
+      bgBottom: '#1a1010',
+      orb1: 'rgba(205, 107, 75, 0.24)',
+      orb2: 'rgba(196, 139, 86, 0.2)',
+      grid: 'rgba(249, 210, 189, 0.18)',
+      glassTint1: 'rgba(255, 149, 104, 0.22)',
+      glassTint2: 'rgba(255, 179, 106, 0.18)',
+    },
+  },
+};
+
 const GLASS_LEVELS: Record<GlassLevel, GlassPalette> = {
   soft: {
     light: {
@@ -221,13 +314,22 @@ function applyDesignTokens(settings: Settings) {
   const root = document.documentElement;
   const mode = settings.darkMode ? 'dark' : 'light';
   const palette = THEME_PRESETS[settings.designPreset] ?? THEME_PRESETS.aurora;
+  const ambiencePalette = THEME_AMBIENCE[settings.designPreset] ?? THEME_AMBIENCE.aurora;
   const glass = GLASS_LEVELS[settings.glassLevel] ?? GLASS_LEVELS.balanced;
   const theme = palette[mode];
+  const ambience = ambiencePalette[mode];
   const glassTokens = glass[mode];
 
   root.style.setProperty('--background', theme.background);
   root.style.setProperty('--foreground', theme.foreground);
   root.style.setProperty('--sidebar-bg', theme.sidebar);
+  root.style.setProperty('--bg-base-top', ambience.bgTop);
+  root.style.setProperty('--bg-base-bottom', ambience.bgBottom);
+  root.style.setProperty('--bg-orb-1', ambience.orb1);
+  root.style.setProperty('--bg-orb-2', ambience.orb2);
+  root.style.setProperty('--bg-grid', ambience.grid);
+  root.style.setProperty('--glass-tint-1', ambience.glassTint1);
+  root.style.setProperty('--glass-tint-2', ambience.glassTint2);
   root.style.setProperty('--brand-1', theme.brand[0]);
   root.style.setProperty('--brand-2', theme.brand[1]);
   root.style.setProperty('--brand-3', theme.brand[2]);

@@ -191,43 +191,45 @@ async def update_task(
         conn.close()
         raise HTTPException(status_code=404, detail="Task not found")
     
+    update_data = task.model_dump(exclude_unset=True) if hasattr(task, 'model_dump') else task.dict(exclude_unset=True)
+
     # Build update
     updates = []
     values = []
     
-    if task.title is not None:
+    if 'title' in update_data:
         updates.append("title = ?")
         values.append(task.title)
-    if task.description is not None:
+    if 'description' in update_data:
         updates.append("description = ?")
         values.append(task.description)
-    if task.completed is not None:
+    if 'completed' in update_data:
         updates.append("completed = ?")
         values.append(1 if task.completed else 0)
-    if task.priority is not None:
+    if 'priority' in update_data:
         updates.append("priority = ?")
         values.append(task.priority)
-    if task.due_date is not None:
+    if 'due_date' in update_data:
         updates.append("due_date = ?")
         values.append(task.due_date)
-    if task.project_id is not None:
+    if 'project_id' in update_data:
         updates.append("project_id = ?")
         values.append(task.project_id)
-    if task.tags is not None:
+    if 'tags' in update_data:
         updates.append("tags = ?")
-        values.append(json.dumps(task.tags))
-    if task.subtasks is not None:
+        values.append(json.dumps(task.tags) if task.tags is not None else None)
+    if 'subtasks' in update_data:
         updates.append("subtasks = ?")
-        values.append(json.dumps(task.subtasks))
-    if task.reminder is not None:
+        values.append(json.dumps(task.subtasks) if task.subtasks is not None else None)
+    if 'reminder' in update_data:
         updates.append("reminder = ?")
         values.append(task.reminder)
-    if task.favorite is not None:
+    if 'favorite' in update_data:
         updates.append("favorite = ?")
         values.append(1 if task.favorite else 0)
-    if task.linked_notes is not None:
+    if 'linked_notes' in update_data:
         updates.append("linked_notes = ?")
-        values.append(json.dumps(task.linked_notes))
+        values.append(json.dumps(task.linked_notes) if task.linked_notes is not None else None)
     
     now = datetime.utcnow().isoformat()
     updates.append("modified_at = ?")

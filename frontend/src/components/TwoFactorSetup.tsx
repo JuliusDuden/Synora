@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTranslation } from '@/lib/useTranslation';
 import { getAuthHeaders } from '@/contexts/AuthContext';
+import { getApiBaseUrl } from '@/lib/apiBase';
 import { Shield, Copy, Check, X } from 'lucide-react';
 import Image from 'next/image';
 
@@ -13,6 +14,7 @@ interface TwoFactorSetupProps {
 
 export default function TwoFactorSetup({ onClose, onSuccess }: TwoFactorSetupProps) {
   const { t } = useTranslation();
+  const apiBaseUrl = getApiBaseUrl();
   const [step, setStep] = useState<'setup' | 'verify'>('setup');
   const [qrCode, setQrCode] = useState('');
   const [secret, setSecret] = useState('');
@@ -27,7 +29,7 @@ export default function TwoFactorSetup({ onClose, onSuccess }: TwoFactorSetupPro
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8000/api/auth/2fa/setup', {
+      const response = await fetch(`${apiBaseUrl}/api/auth/2fa/setup`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
@@ -56,7 +58,7 @@ export default function TwoFactorSetup({ onClose, onSuccess }: TwoFactorSetupPro
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8000/api/auth/2fa/verify', {
+      const response = await fetch(`${apiBaseUrl}/api/auth/2fa/verify`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),

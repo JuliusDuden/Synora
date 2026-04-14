@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api, type GraphData as ApiGraphData } from '@/lib/api';
-import { Pause, Play, RotateCcw, LocateFixed, MousePointer2, ZoomIn } from 'lucide-react';
+import { Pause, Play, RotateCcw, LocateFixed, MousePointer2, ZoomIn, Network, Sparkles, ArrowRight, Tag } from 'lucide-react';
 
 interface Node {
   id: string;
   label: string;
+  tags: string[];
   x: number;
   y: number;
   vx: number;
@@ -59,6 +60,9 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
   const animationRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const dragNodeRef = useRef<Node | null>(null);
+  const mouseDownNodeRef = useRef<Node | null>(null);
+  const dragMovedRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
   const panRef = useRef({ x: 0, y: 0 });
@@ -67,6 +71,7 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(true);
   const [isDark, setIsDark] = useState(false);
+  const [graphLoaded, setGraphLoaded] = useState(false);
 
   // Initialize
   useEffect(() => {
@@ -75,6 +80,17 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
     initializeStars();
     loadGraph();
     startSimulation();
+
+    const canvas = canvasRef.current;
+
+    const nativeWheelHandler = (event: WheelEvent) => {
+      handleWheel(event);
+    };
+
+    // Register wheel with passive:false so zoom can prevent page scroll.
+    if (canvas) {
+      canvas.addEventListener('wheel', nativeWheelHandler, { passive: false });
+    }
 
     const handleResize = () => {
       resizeCanvas();
@@ -85,6 +101,9 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      if (canvas) {
+        canvas.removeEventListener('wheel', nativeWheelHandler);
+      }
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
@@ -125,19 +144,22 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
         const angle = (index / data.nodes.length) * Math.PI * 2;
         const radius = 150 + Math.random() * 100;
         const connections = connectionCount.get(node.id) || 0;
+        const apiSize = Math.max(1, Number((node as any).size || 1));
+        const visualConnections = Math.max(connections, apiSize);
         
         nodes.set(node.id, {
           id: node.id,
           label: node.label,
+          tags: node.tags || [],
           x: Math.cos(angle) * radius,
           y: Math.sin(angle) * radius,
           vx: 0,
           vy: 0,
           fx: 0,
           fy: 0,
-          mass: 1 + connections * 0.2,
-          radius: 8 + connections * 2,
-          connections,
+          mass: 1 + visualConnections * 0.16,
+          radius: Math.min(26, 7 + visualConnections * 1.6),
+          connections: visualConnections,
         });
       });
 
@@ -154,8 +176,10 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
       nodesRef.current = nodes;
       edgesRef.current = edges;
       setStats({ nodes: nodes.size, edges: edges.length, energy: 0 });
+      setGraphLoaded(true);
     } catch (error) {
       console.error('Failed to load graph:', error);
+      setGraphLoaded(true);
     }
   };
 
@@ -283,21 +307,22 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const css = getComputedStyle(document.documentElement);
+    const brand1 = (css.getPropertyValue('--brand-1') || '#6366f1').trim();
+    const brand2 = (css.getPropertyValue('--brand-2') || '#8b5cf6').trim();
+    const brand3 = (css.getPropertyValue('--brand-3') || '#a78bfa').trim();
+    const bgTop = (css.getPropertyValue('--bg-base-top') || (isDark ? '#0f172a' : '#f8fafc')).trim();
+    const bgBottom = (css.getPropertyValue('--bg-base-bottom') || (isDark ? '#0b1220' : '#e2e8f0')).trim();
+
     // Clear with space gradient
     const gradient = ctx.createRadialGradient(
       canvas.width / 2, canvas.height / 2, 0,
       canvas.width / 2, canvas.height / 2, canvas.width / 2
     );
     
-    if (isDark) {
-      gradient.addColorStop(0, '#0f172a');
-      gradient.addColorStop(0.5, '#1e1b4b');
-      gradient.addColorStop(1, '#0c0a1f');
-    } else {
-      gradient.addColorStop(0, '#f8fafc');
-      gradient.addColorStop(0.5, '#e0e7ff');
-      gradient.addColorStop(1, '#dbeafe');
-    }
+    gradient.addColorStop(0, bgTop);
+    gradient.addColorStop(0.45, isDark ? '#111827' : '#f1f5f9');
+    gradient.addColorStop(1, bgBottom);
     
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -334,13 +359,13 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
       const gradient = ctx.createLinearGradient(source.x, source.y, target.x, target.y);
       
       if (isDark) {
-        gradient.addColorStop(0, isConnected ? '#818cf8' : 'rgba(100, 116, 139, 0.3)');
-        gradient.addColorStop(0.5, isConnected ? '#a78bfa' : 'rgba(100, 116, 139, 0.2)');
-        gradient.addColorStop(1, isConnected ? '#c084fc' : 'rgba(100, 116, 139, 0.3)');
+        gradient.addColorStop(0, isConnected ? brand1 : 'rgba(100, 116, 139, 0.3)');
+        gradient.addColorStop(0.5, isConnected ? brand2 : 'rgba(100, 116, 139, 0.2)');
+        gradient.addColorStop(1, isConnected ? brand3 : 'rgba(100, 116, 139, 0.3)');
       } else {
-        gradient.addColorStop(0, isConnected ? '#6366f1' : 'rgba(148, 163, 184, 0.4)');
-        gradient.addColorStop(0.5, isConnected ? '#8b5cf6' : 'rgba(148, 163, 184, 0.3)');
-        gradient.addColorStop(1, isConnected ? '#a855f7' : 'rgba(148, 163, 184, 0.4)');
+        gradient.addColorStop(0, isConnected ? brand1 : 'rgba(148, 163, 184, 0.4)');
+        gradient.addColorStop(0.5, isConnected ? brand2 : 'rgba(148, 163, 184, 0.3)');
+        gradient.addColorStop(1, isConnected ? brand3 : 'rgba(148, 163, 184, 0.4)');
       }
 
       ctx.strokeStyle = gradient;
@@ -355,7 +380,7 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
         const pulse = Math.sin(time * 3) * 0.5 + 0.5;
         ctx.strokeStyle = isDark 
           ? `rgba(167, 139, 250, ${pulse * 0.3})`
-          : `rgba(139, 92, 246, ${pulse * 0.3})`;
+          : `rgba(99, 102, 241, ${pulse * 0.3})`;
         ctx.lineWidth = 3;
         ctx.stroke();
       }
@@ -373,7 +398,7 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
           node.x, node.y, 0,
           node.x, node.y, node.radius * 3
         );
-        glowGradient.addColorStop(0, isDark ? 'rgba(167, 139, 250, 0.4)' : 'rgba(139, 92, 246, 0.4)');
+        glowGradient.addColorStop(0, isDark ? 'rgba(148, 163, 255, 0.36)' : 'rgba(99, 102, 241, 0.36)');
         glowGradient.addColorStop(1, 'rgba(167, 139, 250, 0)');
         
         ctx.fillStyle = glowGradient;
@@ -393,18 +418,18 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
           nodeGradient.addColorStop(0, 'rgba(71, 85, 105, 0.3)');
           nodeGradient.addColorStop(1, 'rgba(51, 65, 85, 0.3)');
         } else {
-          nodeGradient.addColorStop(0, '#6366f1');
-          nodeGradient.addColorStop(0.5, '#4f46e5');
-          nodeGradient.addColorStop(1, '#4338ca');
+          nodeGradient.addColorStop(0, brand1);
+          nodeGradient.addColorStop(0.5, brand2);
+          nodeGradient.addColorStop(1, brand3);
         }
       } else {
         if (isDimmed) {
           nodeGradient.addColorStop(0, 'rgba(203, 213, 225, 0.5)');
           nodeGradient.addColorStop(1, 'rgba(148, 163, 184, 0.5)');
         } else {
-          nodeGradient.addColorStop(0, '#818cf8');
-          nodeGradient.addColorStop(0.5, '#6366f1');
-          nodeGradient.addColorStop(1, '#4f46e5');
+          nodeGradient.addColorStop(0, brand1);
+          nodeGradient.addColorStop(0.5, brand2);
+          nodeGradient.addColorStop(1, brand3);
         }
       }
 
@@ -476,6 +501,8 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
     
     // Store last mouse position
     lastMousePosRef.current = { x: mouseX, y: mouseY };
+    dragStartRef.current = { x: mouseX, y: mouseY };
+    dragMovedRef.current = false;
     
     // Transform to graph coordinates
     const x = (mouseX - canvas.width / 2 - panRef.current.x) / zoomRef.current;
@@ -497,12 +524,13 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
       e.preventDefault();
       isDraggingRef.current = true;
       dragNodeRef.current = clickedNode;
+      mouseDownNodeRef.current = clickedNode;
       setSelectedNode(clickedNode.id);
-      onNodeClick(clickedNode.label);
       
       // Force immediate render
       forceRenderRef.current++;
     } else {
+      mouseDownNodeRef.current = null;
       setSelectedNode(null);
     }
   };
@@ -518,6 +546,11 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
     // Handle dragging FIRST (highest priority)
     if (isDraggingRef.current && dragNodeRef.current) {
       e.preventDefault();
+
+      const movedDistance = Math.hypot(mouseX - dragStartRef.current.x, mouseY - dragStartRef.current.y);
+      if (movedDistance > 4) {
+        dragMovedRef.current = true;
+      }
       
       // Transform to graph coordinates with current zoom and pan
       const x = (mouseX - canvas.width / 2 - panRef.current.x) / zoomRef.current;
@@ -555,8 +588,14 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
   };
 
   const handleMouseUp = () => {
+    if (mouseDownNodeRef.current && !dragMovedRef.current) {
+      onNodeClick(mouseDownNodeRef.current.id);
+    }
+
     isDraggingRef.current = false;
     dragNodeRef.current = null;
+    mouseDownNodeRef.current = null;
+    dragMovedRef.current = false;
     
     const canvas = canvasRef.current;
     if (canvas) {
@@ -564,7 +603,7 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
     }
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+  const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -613,31 +652,66 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
     setIsSimulating(!isSimulating);
   };
 
+  const nodesArray = Array.from(nodesRef.current.values());
+
+  const topHubs = [...nodesArray]
+    .sort((a, b) => b.connections - a.connections)
+    .slice(0, 5);
+
+  const isolatedCount = nodesArray.filter((n) => n.connections === 0).length;
+
+  const selectedNodeData = selectedNode ? nodesRef.current.get(selectedNode) || null : null;
+
+  const selectedNeighbors: Node[] = selectedNode
+    ? Array.from(
+        new Set(
+          edgesRef.current.flatMap((edge) => {
+            if (edge.source === selectedNode) return [edge.target];
+            if (edge.target === selectedNode) return [edge.source];
+            return [];
+          })
+        )
+      )
+        .map((id) => nodesRef.current.get(id))
+        .filter((n): n is Node => !!n)
+        .sort((a, b) => b.connections - a.connections)
+        .slice(0, 8)
+    : [];
+
   return (
     <div className="relative w-full h-full">
       <canvas
         ref={canvasRef}
         className="w-full h-full"
+        style={{ touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
       />
 
-      {/* Stats Overlay */}
-      <div className="absolute top-4 left-4 glass-panel text-slate-800 dark:text-slate-100 px-4 py-3 rounded-xl space-y-1 text-sm font-mono border border-white/60 dark:border-slate-500/30">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
-          <span>{stats.nodes} Nodes</span>
+      {/* Stats + Usecase Overlay */}
+      <div className="absolute top-4 left-4 ui-surface-strong text-slate-800 dark:text-slate-100 px-4 py-3 rounded-2xl space-y-2 text-sm border border-white/60 dark:border-slate-500/30 max-w-[320px]">
+        <div className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">
+          <Network size={12} /> Knowledge Graph
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-purple-400 rounded-full" />
-          <span>{stats.edges} Edges</span>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="ui-surface rounded-lg px-2 py-1.5">
+            <p className="text-[10px] opacity-70">Notes</p>
+            <p className="font-semibold">{stats.nodes}</p>
+          </div>
+          <div className="ui-surface rounded-lg px-2 py-1.5">
+            <p className="text-[10px] opacity-70">Links</p>
+            <p className="font-semibold">{stats.edges}</p>
+          </div>
+          <div className="ui-surface rounded-lg px-2 py-1.5">
+            <p className="text-[10px] opacity-70">Isolated</p>
+            <p className="font-semibold">{isolatedCount}</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isSimulating ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`} />
-          <span>Energy: {stats.energy}</span>
+        <div className="text-xs text-slate-600 dark:text-slate-300 inline-flex items-start gap-2">
+          <Sparkles size={13} className="mt-0.5" />
+          <span>Usecase: Finde deine zentralen Wissens-Hubs und springe von einem Thema direkt in verbundene Notizen.</span>
         </div>
       </div>
 
@@ -645,25 +719,87 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
       <div className="absolute top-4 right-4 flex flex-col gap-2">
         <button
           onClick={toggleSimulation}
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-indigo-400/30"
+          className="inline-flex items-center gap-2 ui-button-primary text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
         >
           {isSimulating ? <Pause size={14} /> : <Play size={14} />}
           <span>{isSimulating ? 'Pause' : 'Play'}</span>
         </button>
         <button
           onClick={handleRestart}
-          className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-purple-400/30"
+          className="inline-flex items-center gap-2 ui-button-ghost px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
         >
           <RotateCcw size={14} />
           <span>Restart</span>
         </button>
         <button
           onClick={handleReset}
-          className="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg border border-slate-500/30"
+          className="inline-flex items-center gap-2 ui-button-ghost px-4 py-2 rounded-lg font-medium transition-colors shadow-lg"
         >
           <LocateFixed size={14} />
           <span>Center</span>
         </button>
+      </div>
+
+      {/* Practical Insight Panel */}
+      <div className="absolute bottom-4 right-4 ui-surface-strong text-slate-800 dark:text-slate-100 p-3 rounded-2xl border border-white/60 dark:border-slate-500/30 w-[330px] max-h-[45%] overflow-auto">
+        {!graphLoaded ? (
+          <p className="text-sm text-slate-500 dark:text-slate-300">Lade Graph-Daten...</p>
+        ) : selectedNodeData ? (
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Ausgewählt</p>
+              <p className="text-sm font-semibold truncate">{selectedNodeData.label}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{selectedNeighbors.length} direkte Verbindungen</p>
+              {selectedNodeData.tags.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {selectedNodeData.tags.slice(0, 4).map((tagValue) => (
+                    <span key={tagValue} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ui-surface">
+                      <Tag size={10} /> {tagValue}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300 mb-1">Verbundenen Notizen</p>
+              <div className="space-y-1.5">
+                {selectedNeighbors.length === 0 && <p className="text-xs text-slate-500 dark:text-slate-300">Keine direkten Verbindungen gefunden.</p>}
+                {selectedNeighbors.map((neighbor) => (
+                  <button
+                    key={neighbor.id}
+                    onClick={() => onNodeClick(neighbor.id)}
+                    className="w-full text-left ui-surface rounded-lg px-2.5 py-2 text-xs hover:border-slate-400 dark:hover:border-slate-500 transition-colors inline-flex items-center justify-between gap-2"
+                  >
+                    <span className="truncate">{neighbor.label}</span>
+                    <span className="opacity-60 text-[10px] inline-flex items-center gap-1">
+                      {neighbor.connections} <ArrowRight size={11} />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Top Hubs</p>
+            <div className="space-y-1.5">
+              {topHubs.map((node) => (
+                <button
+                  key={node.id}
+                  onClick={() => {
+                    setSelectedNode(node.id);
+                    onNodeClick(node.id);
+                  }}
+                  className="w-full text-left ui-surface rounded-lg px-2.5 py-2 text-xs hover:border-slate-400 dark:hover:border-slate-500 transition-colors inline-flex items-center justify-between gap-2"
+                >
+                  <span className="truncate">{node.label}</span>
+                  <span className="opacity-60 text-[10px]">{node.connections} links</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-300">Tipp: Klicke einen Hub, um den Kontext (direkte Verbindungen) unten zu sehen.</p>
+          </div>
+        )}
       </div>
 
       {/* Hints */}
@@ -674,6 +810,8 @@ export default function GraphView({ onNodeClick }: GraphViewProps) {
           <span className="opacity-50">•</span>
           <ZoomIn size={14} />
           <span>Scroll to zoom</span>
+          <span className="opacity-50">•</span>
+          <span>Click hub for context</span>
         </span>
       </div>
     </div>

@@ -18,6 +18,22 @@ router = APIRouter()
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "notes.db")
 
+
+def _is_valid_note_name(value: str) -> bool:
+    name = (value or "").strip()
+    if not name or len(name) > 255:
+        return False
+    if "\\" in name or name.startswith("/"):
+        return False
+    if any(ord(ch) < 32 for ch in name):
+        return False
+
+    parts = name.split("/")
+    for part in parts:
+        if not part or part in (".", ".."):
+            return False
+    return True
+
 def parse_frontmatter(content: str):
     """Extract frontmatter metadata from markdown content"""
     metadata = {
@@ -143,6 +159,9 @@ async def list_shared_notes(current_user: User = Depends(get_current_user)):
 @router.get("/{name:path}", response_model=Note)
 async def get_note(name: str, current_user: User = Depends(get_current_user)):
     """Get a specific note for current user or shared with user"""
+    if not _is_valid_note_name(name):
+        raise HTTPException(status_code=400, detail="Invalid note name")
+
     conn = get_db()
     cursor = conn.cursor()
     
@@ -197,6 +216,12 @@ async def get_note(name: str, current_user: User = Depends(get_current_user)):
 async def create_note(note_data: NoteCreate, current_user: User = Depends(get_current_user)):
     """Create a new note for current user"""
     try:
+        if not _is_valid_note_name(note_data.name):
+            raise HTTPException(status_code=400, detail="Invalid note name")
+
+        if note_data.folder and not _is_valid_note_name(note_data.folder):
+            raise HTTPException(status_code=400, detail="Invalid folder name")
+
         conn = get_db()
         cursor = conn.cursor()
         
@@ -255,6 +280,12 @@ async def update_note(
     current_user: User = Depends(get_current_user)
 ):
     """Update an existing note for current user or shared note with edit permission"""
+    if not _is_valid_note_name(name):
+        raise HTTPException(status_code=400, detail="Invalid note name")
+
+    if note_data.name and not _is_valid_note_name(note_data.name):
+        raise HTTPException(status_code=400, detail="Invalid target note name")
+
     conn = get_db()
     cursor = conn.cursor()
     
@@ -340,6 +371,9 @@ async def update_note(
 @router.delete("/{name:path}", response_model=dict)
 async def delete_note(name: str, current_user: User = Depends(get_current_user)):
     """Delete a note for current user and all its attachments"""
+    if not _is_valid_note_name(name):
+        raise HTTPException(status_code=400, detail="Invalid note name")
+
     conn = get_db()
     cursor = conn.cursor()
     

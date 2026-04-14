@@ -3,8 +3,9 @@
 import { useEffect, useRef } from 'react';
 import MarkdownIt from 'markdown-it';
 import markdownItTaskLists from 'markdown-it-task-lists';
+import { getApiBaseUrl } from '@/lib/apiBase';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = getApiBaseUrl();
 
 const md = new MarkdownIt({
   html: true,

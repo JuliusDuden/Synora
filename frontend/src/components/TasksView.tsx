@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Clock, Check, ArrowRight, FolderOpen, Trash2, CheckSquare, Share2 } from 'lucide-react';
 import { useTranslation } from '@/lib/useTranslation';
 import { api } from '@/lib/api';
@@ -21,14 +21,21 @@ interface Task {
 
 interface TaskCardProps {
   task: Task;
+  status: TaskColumn;
   onToggle: (id: string) => void;
   onMoveToProgress?: (id: string) => void;
   onDelete: (id: string) => void;
   onClick?: (id: string) => void;
   onShare?: (task: Task) => void;
+  onDragStart: (task: Task, status: TaskColumn) => void;
+  onDragEnd: () => void;
   priorityColors: Record<string, string>;
   projects: any[];
+  isDragged?: boolean;
+  suppressClick?: boolean;
 }
+
+type TaskColumn = 'todo' | 'inProgress' | 'done';
 
 const priorityColors: Record<string, string> = {
   high: 'border-red-500',
@@ -49,10 +56,22 @@ export default function TasksView() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareTask, setShareTask] = useState<Task | null>(null);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<TaskColumn | null>(null);
+  const [recentlyDraggedTaskId, setRecentlyDraggedTaskId] = useState<string | null>(null);
+  const dragResetTimer = useRef<number | null>(null);
 
   useEffect(() => {
     loadTasks();
     loadProjects();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (dragResetTimer.current) {
+        window.clearTimeout(dragResetTimer.current);
+      }
+    };
   }, []);
 
   const loadTasks = async () => {
@@ -83,6 +102,52 @@ export default function TasksView() {
   const openShareDialog = (task: Task) => {
     setShareTask(task);
     setShareDialogOpen(true);
+  };
+
+  const clearDragState = () => {
+    setDraggedTaskId(null);
+    setDragOverColumn(null);
+  };
+
+  const markRecentlyDragged = (taskId: string) => {
+    if (dragResetTimer.current) {
+      window.clearTimeout(dragResetTimer.current);
+    }
+
+    setRecentlyDraggedTaskId(taskId);
+    dragResetTimer.current = window.setTimeout(() => {
+      setRecentlyDraggedTaskId(null);
+      dragResetTimer.current = null;
+    }, 180);
+  };
+
+  const getTaskColumn = (task: Task): TaskColumn => {
+    if (task.completed) return 'done';
+    return task.due_date ? 'inProgress' : 'todo';
+  };
+
+  const moveTaskToColumn = async (id: string, targetColumn: TaskColumn) => {
+    const task = tasks.find(item => item.id === id);
+    if (!task) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const payload =
+      targetColumn === 'done'
+        ? { completed: true }
+        : targetColumn === 'inProgress'
+          ? { completed: false, due_date: today }
+          : { completed: false, due_date: null };
+
+    try {
+      const updated = await api.updateTask(id, payload);
+      setTasks(prev => prev.map(item => (
+        item.id === id
+          ? { ...item, completed: updated.completed, due_date: updated.due_date }
+          : item
+      )));
+    } catch (error) {
+      console.error('Failed to update task column:', error);
+    }
   };
 
   const createTask = async () => {
@@ -117,13 +182,7 @@ export default function TasksView() {
   };
 
   const moveToProgress = async (id: string) => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const updated = await api.updateTask(id, { due_date: today });
-      setTasks(tasks.map(t => t.id === id ? { ...t, due_date: updated.due_date } : t));
-    } catch (error) {
-      console.error('Failed to move task to progress:', error);
-    }
+    await moveTaskToColumn(id, 'inProgress');
   };
 
   const deleteTask = async (id: string) => {
@@ -163,6 +222,40 @@ export default function TasksView() {
   const todoTasks = tasks.filter(t => !t.completed && !t.due_date);
   const inProgressTasks = tasks.filter(t => !t.completed && t.due_date);
   const doneTasks = tasks.filter(t => t.completed);
+
+  const columns: Array<{
+    id: TaskColumn;
+    title: string;
+    icon: JSX.Element;
+    count: number;
+    badgeClassName: string;
+    tasks: Task[];
+  }> = [
+    {
+      id: 'todo',
+      title: 'Todo',
+      icon: <Clock size={18} className="text-gray-400" />,
+      count: todoTasks.length,
+      badgeClassName: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
+      tasks: todoTasks,
+    },
+    {
+      id: 'inProgress',
+      title: 'In Progress',
+      icon: <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />,
+      count: inProgressTasks.length,
+      badgeClassName: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400',
+      tasks: inProgressTasks,
+    },
+    {
+      id: 'done',
+      title: 'Done',
+      icon: <Check size={18} className="text-green-500" />,
+      count: doneTasks.length,
+      badgeClassName: 'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400',
+      tasks: doneTasks,
+    },
+  ];
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
@@ -240,84 +333,85 @@ export default function TasksView() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Clock size={18} className="text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Todo
-              </h2>
-              <span className="ml-auto px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-medium text-gray-600 dark:text-gray-400">
-                {todoTasks.length}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {todoTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onToggle={toggleStatus}
-                  onMoveToProgress={moveToProgress}
-                  onDelete={deleteTask}
-                  onClick={setSelectedTaskId}
-                  onShare={openShareDialog}
-                  priorityColors={priorityColors}
-                  projects={projects}
-                />
-              ))}
-            </div>
-          </div>
+          {columns.map(column => {
+            const isDropTarget = dragOverColumn === column.id;
 
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                In Progress
-              </h2>
-              <span className="ml-auto px-2 py-0.5 bg-amber-100 dark:bg-amber-950 rounded text-xs font-medium text-amber-700 dark:text-amber-400">
-                {inProgressTasks.length}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {inProgressTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onToggle={toggleStatus}
-                  onDelete={deleteTask}
-                  onClick={setSelectedTaskId}
-                  onShare={openShareDialog}
-                  priorityColors={priorityColors}
-                  projects={projects}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Check size={18} className="text-green-500" />
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Done
-              </h2>
-              <span className="ml-auto px-2 py-0.5 bg-green-100 dark:bg-green-950 rounded text-xs font-medium text-green-700 dark:text-green-400">
-                {doneTasks.length}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {doneTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onToggle={toggleStatus}
-                  onDelete={deleteTask}
-                  onClick={setSelectedTaskId}
-                  onShare={openShareDialog}
-                  priorityColors={priorityColors}
-                  projects={projects}
-                />
-              ))}
-            </div>
-          </div>
+            return (
+              <div
+                key={column.id}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragOverColumn(column.id);
+                }}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setDragOverColumn(column.id);
+                }}
+                onDragLeave={(event) => {
+                  if (event.currentTarget === event.target) {
+                    setDragOverColumn(previous => previous === column.id ? null : previous);
+                  }
+                }}
+                onDrop={async (event) => {
+                  event.preventDefault();
+                  const taskId = event.dataTransfer.getData('text/plain');
+                  if (taskId) {
+                    await moveTaskToColumn(taskId, column.id);
+                    markRecentlyDragged(taskId);
+                  }
+                  clearDragState();
+                }}
+                className={`rounded-2xl border p-3 transition-all ${
+                  isDropTarget
+                    ? 'border-gray-400 dark:border-gray-500 bg-gray-100/80 dark:bg-gray-900/70 shadow-lg'
+                    : 'border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/60'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  {column.icon}
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {column.title}
+                  </h2>
+                  <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${column.badgeClassName}`}>
+                    {column.count}
+                  </span>
+                </div>
+                <div className="space-y-2 min-h-[96px]">
+                  {column.tasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      status={getTaskColumn(task)}
+                      onToggle={toggleStatus}
+                      onMoveToProgress={moveToProgress}
+                      onDelete={deleteTask}
+                      onClick={setSelectedTaskId}
+                      onShare={openShareDialog}
+                      onDragStart={(draggedTask, status) => {
+                        setDraggedTaskId(draggedTask.id ?? null);
+                        setDragOverColumn(status);
+                      }}
+                      onDragEnd={() => {
+                        clearDragState();
+                        if (task.id) {
+                          markRecentlyDragged(task.id);
+                        }
+                      }}
+                      isDragged={draggedTaskId === task.id}
+                      suppressClick={recentlyDraggedTaskId === task.id}
+                      priorityColors={priorityColors}
+                      projects={projects}
+                    />
+                  ))}
+                  {column.tasks.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-800 px-4 py-8 text-center text-xs text-gray-400 dark:text-gray-600">
+                      Drag tasks here
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Shared Tasks Section */}
@@ -388,19 +482,45 @@ export default function TasksView() {
   );
 }
 
-function TaskCard({ task, onToggle, onMoveToProgress, onDelete, onClick, onShare, priorityColors, projects }: TaskCardProps) {
+function TaskCard({
+  task,
+  status,
+  onToggle,
+  onMoveToProgress,
+  onDelete,
+  onClick,
+  onShare,
+  onDragStart,
+  onDragEnd,
+  priorityColors,
+  projects,
+  isDragged,
+  suppressClick,
+}: TaskCardProps) {
   const project = projects.find(p => String(p.id) === String(task.project_id));
   const priorityClass = priorityColors[task.priority] || '';
 
   return (
     <div 
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', task.id!);
+        onDragStart(task, status);
+      }}
+      onDragEnd={() => {
+        onDragEnd();
+      }}
       onClick={(e) => {
-        // Only open detail if not clicking on action buttons
-        if (!(e.target as HTMLElement).closest('button')) {
+        // Only open detail if not clicking on action buttons or after a drag.
+        if (suppressClick || !(e.target as HTMLElement).closest('button')) {
+          if (suppressClick) {
+            return;
+          }
           onClick?.(task.id!);
         }
       }}
-      className={`bg-white dark:bg-gray-900 rounded-lg p-3 border-l-4 ${priorityClass} border-r border-t border-b border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer`}
+      className={`bg-white dark:bg-gray-900 rounded-lg p-3 border-l-4 ${priorityClass} border-r border-t border-b border-gray-200 dark:border-gray-800 hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${isDragged ? 'opacity-50 scale-[0.98] shadow-lg ring-2 ring-gray-300 dark:ring-gray-700' : ''}`}
     >
       <div className="flex items-start gap-3">
         <button
